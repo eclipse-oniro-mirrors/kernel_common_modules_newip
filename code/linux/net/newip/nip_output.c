@@ -438,7 +438,7 @@ void tcp_nip_actual_send_reset(struct sock *sk, struct sk_buff *skb, u32 seq,
 	/* alloc skb */
 	buff = alloc_skb(MAX_TCP_HEADER, priority);
 	if (!buff) {
-		DEBUG("%s: alloc_skb failed.\n", __func__);
+		DEBUG("%s: alloc_skb failed.", __func__);
 		return;
 	}
 	skb_reserve(buff, MAX_TCP_HEADER);
@@ -460,9 +460,9 @@ void tcp_nip_actual_send_reset(struct sock *sk, struct sk_buff *skb, u32 seq,
 	t1->rst = rst;
 	t1->window = htons(win);
 	t1->check = htons(nip_get_output_checksum_tcp(buff, *saddr, *daddr));
-	DEBUG("%s: host dport==%u, net dport==%x, host sport==%u, net sport==%x\n",
+	DEBUG("%s: host dport==%u, net dport==%x, host sport==%u, net sport==0x%x",
 	      __func__, ntohs(t1->dest), t1->dest, ntohs(t1->source), t1->source);
-	DEBUG("%s: host seq==%u, net seq==%x, host ack_seq==%u, net ack_seq==%x\n",
+	DEBUG("%s: host seq==%u, net seq==%x, host ack_seq==%u, net ack_seq==0x%x",
 	      __func__, seq, t1->seq, ack_seq, t1->ack_seq);
 
 	buff->protocol = htons(ETH_P_NEWIP);

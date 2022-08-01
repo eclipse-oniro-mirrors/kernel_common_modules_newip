@@ -96,7 +96,7 @@ extern int g_nip_keepalive_probes;
 extern int g_nip_tcp_zero_probe;
 
 /*********************************************************************************************/
-/*                            window mode parameters                                           */
+/*                            window mode parameters                                         */
 /*********************************************************************************************/
 extern bool g_nip_tcp_snd_win_enable;
 extern bool g_nip_tcp_rcv_win_enable;

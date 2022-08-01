@@ -508,7 +508,7 @@ int nndisc_rcv_ns(struct sk_buff *skb)
 	}
 
 	if (nip_addr_invalid(&addr)) {
-		DEBUG("%s: icmp hdr addr invalid.", __func__);
+		DEBUG("%s: icmp hdr addr invalid, bitlen=%u.", __func__, addr.bitlen);
 		err = -EFAULT;
 		goto out;
 	}

@@ -100,8 +100,8 @@ static bool retransmits_nip_timed_out(struct sock *sk,
 	 * Currently, it determines whether the timeout period is based on
 	 * the retransmission times
 	 */
-	DEBUG("%s: icsk->retransmits=%u\n", __func__,
-	      inet_csk(sk)->icsk_retransmits);
+	DEBUG("%s: icsk->retransmits=%u, boundary=%u", __func__,
+	      inet_csk(sk)->icsk_retransmits, boundary);
 	return inet_csk(sk)->icsk_retransmits > boundary;
 }
 
@@ -187,7 +187,7 @@ void tcp_nip_probe_timer(struct sock *sk)
 
 	if (tp->packets_out || !tcp_nip_send_head(sk)) {
 		icsk->icsk_probes_out = 0;
-		DEBUG("[nip]%s packets_out!=0 or send_head=NULL, don't send probe packet.",
+		DEBUG("%s packets_out!=0 or send_head=NULL, don't send probe packet.",
 		      __func__);
 		return;
 	}
@@ -197,12 +197,17 @@ void tcp_nip_probe_timer(struct sock *sk)
 		const bool alive = inet_csk_rto_backoff(icsk, TCP_RTO_MAX) < TCP_RTO_MAX;
 
 		max_probes = tcp_nip_orphan_retries(sk, alive);
-		if (!alive && icsk->icsk_backoff >= max_probes)
+		if (!alive && icsk->icsk_backoff >= max_probes) {
+			pr_crit("%s will close session, icsk_backoff=%u, max_probes=%u",
+				__func__, icsk->icsk_backoff, max_probes);
 			goto abort;
+		}
 	}
 
 	if (icsk->icsk_probes_out >= max_probes) {
-abort:		tcp_nip_write_err(sk);
+abort:		pr_crit("%s close session, icsk_backoff=%u, max_probes=%u",
+			__func__, icsk->icsk_backoff, max_probes);
+		tcp_nip_write_err(sk);
 	} else {
 		/* Only send another probe if we didn't close things up. */
 		tcp_nip_send_probe0(sk);

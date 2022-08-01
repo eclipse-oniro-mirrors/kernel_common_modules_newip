@@ -164,7 +164,7 @@ int g_nip_tcp_zero_probe = 20;
 module_param_named(nip_tcp_zero_probe, g_nip_tcp_zero_probe, int, 0644);
 
 /*********************************************************************************************/
-/*                            window mode parameters                                           */
+/*                            window mode parameters                                         */
 /*********************************************************************************************/
 bool g_nip_tcp_snd_win_enable;
 module_param_named(nip_tcp_snd_win_enable, g_nip_tcp_snd_win_enable, bool, 0644);

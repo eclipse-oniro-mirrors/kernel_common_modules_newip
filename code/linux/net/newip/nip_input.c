@@ -50,7 +50,7 @@ static int nip_rcv_finish(struct sk_buff *skb)
 	if (net->ipv4.sysctl_ip_early_demux && !skb_dst(skb) && !skb->sk) {
 		const struct ninet_protocol *ipprot;
 
-		DEBUG("%s: try to early demux skb.\n", __func__);
+		DEBUG("%s: try to early demux skb.", __func__);
 		ipprot = rcu_dereference(ninet_protos[NIPCB(skb)->nexthdr]);
 		if (ipprot)
 			edemux = READ_ONCE(ipprot->early_demux);

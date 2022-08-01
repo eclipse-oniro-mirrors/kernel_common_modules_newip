@@ -144,7 +144,7 @@ void __tcp_nip_push_pending_frames(struct sock *sk, unsigned int cur_mss,
 
 	if (tcp_nip_write_xmit(sk, cur_mss, nonagle, 0,
 			       sk_gfp_mask(sk, GFP_ATOMIC))) {
-		DEBUG("%s check probe0 timer!\n", __func__);
+		DEBUG("%s check probe0 timer!", __func__);
 		tcp_nip_check_probe_timer(sk);
 	}
 }
@@ -380,7 +380,7 @@ static unsigned int tcp_nip_syn_options(struct sock *sk, struct sk_buff *skb,
 	unsigned int remaining = MAX_TCP_OPTION_SPACE;
 
 	opts->mss = tcp_nip_advertise_mss(sk);
-	DEBUG("advertise mss%d", opts->mss);
+	DEBUG("advertise mss %d", opts->mss);
 	remaining -= TCPOLEN_MSS_ALIGNED;
 
 	return MAX_TCP_OPTION_SPACE - remaining;
@@ -506,9 +506,9 @@ static int __tcp_nip_transmit_skb(struct sock *sk, struct sk_buff *skb,
 	skb_set_hash_from_sk(skb, sk);
 	/* Increase allocated memory */
 	refcount_add(skb->truesize, &sk->sk_wmem_alloc);
-	DEBUG("th->inet_sport==%u, th->inet_dport==%u\n",
+	DEBUG("th->inet_sport=%u, th->inet_dport=%u",
 	      ntohs(inet->inet_sport), ntohs(inet->inet_dport));
-	DEBUG("sk->sk_rcvbuf==%d, sk->sk_rmem_alloc==%d\n",
+	DEBUG("sk->sk_rcvbuf=%d, sk->sk_rmem_alloc=%d",
 	      sk->sk_rcvbuf, atomic_read(&sk->sk_rmem_alloc));
 	/* Build TCP header and checksum it. */
 	th = (struct tcphdr *)skb->data;
@@ -634,9 +634,9 @@ unsigned int tcp_nip_sync_mss(struct sock *sk, u32 pmtu)
 		icsk->icsk_mtup.search_high = pmtu;
 
 	mss_now = tcp_nip_mtu_to_mss(sk, pmtu);
-	DEBUG("%s: sync mtu_to_mss %d\n", __func__, mss_now);
+	DEBUG("%s: sync mtu_to_mss %d", __func__, mss_now);
 	mss_now = tcp_bound_to_half_wnd(tp, mss_now);
-	DEBUG("%s: sync bound to half wnd %d\n", __func__, mss_now);
+	DEBUG("%s: sync bound to half wnd %d", __func__, mss_now);
 
 	/* And store cached results */
 	icsk->icsk_pmtu_cookie = pmtu;
@@ -644,7 +644,7 @@ unsigned int tcp_nip_sync_mss(struct sock *sk, u32 pmtu)
 		mss_now = min(mss_now, tcp_nip_mtu_to_mss(sk, icsk->icsk_mtup.search_low));
 	tp->mss_cache = mss_now;
 
-	DEBUG("%s: sync final mss %d\n", __func__, mss_now);
+	DEBUG("%s: sync final mss %d", __func__, mss_now);
 
 	return mss_now;
 }
@@ -660,14 +660,14 @@ unsigned int tcp_nip_current_mss(struct sock *sk)
 
 	mss_now = tp->mss_cache;
 
-	DEBUG("%s: mss_cache %d\n", __func__, mss_now);
+	DEBUG("%s: mss_cache %d", __func__, mss_now);
 
 	if (dst) {
 		u32 mtu = dst_mtu(dst);
 
 		if (mtu != inet_csk(sk)->icsk_pmtu_cookie)
 			mss_now = tcp_nip_sync_mss(sk, mtu);
-		DEBUG("%s: mtu %d\n", __func__, mtu);
+		DEBUG("%s: mtu %d", __func__, mtu);
 	}
 
 	header_len = tcp_nip_established_options(sk, NULL, &opts) +
@@ -678,7 +678,7 @@ unsigned int tcp_nip_current_mss(struct sock *sk)
 
 		mss_now -= delta;
 	}
-	DEBUG("%s:after sync_mss%d\n", __func__, mss_now);
+	DEBUG("%s: after sync_mss %d", __func__, mss_now);
 	return mss_now;
 }
 
@@ -964,7 +964,7 @@ void tcp_nip_send_fin(struct sock *sk)
 	struct tcp_sock *tp = tcp_sk(sk);
 	u32 cur_mss;
 
-	DEBUG("%s: send fin!\n", __func__);
+	DEBUG("%s: send fin!", __func__);
 	/* Set the fin position of the last packet to 1 */
 	if (tskb && tcp_nip_send_head(sk)) {
 coalesce:
@@ -993,11 +993,11 @@ void tcp_nip_send_active_reset(struct sock *sk, gfp_t priority)
 {
 	struct sk_buff *skb;
 
-	DEBUG("%s: send RST!\n", __func__);
+	DEBUG("%s: send RST!", __func__);
 	/* NOTE: No TCP options attached and we never retransmit this. */
 	skb = alloc_skb(MAX_TCP_HEADER, priority);
 	if (!skb) {
-		DEBUG("%s: alloc_skb failed.\n", __func__);
+		DEBUG("%s: alloc_skb failed.", __func__);
 		return;
 	}
 	/* Reserve space for headers and prepare control bits. */
@@ -1071,7 +1071,7 @@ static bool tcp_nip_write_xmit(struct sock *sk, unsigned int mss_now, int nonagl
 	}
 
 	while ((skb = tcp_nip_send_head(sk)) && (snd_num--)) {
-		DEBUG("%s:tcp_nip_send_head head found!\n", __func__);
+		DEBUG("%s:tcp_nip_send_head head found!", __func__);
 		tcp_nip_init_tso_segs(skb, mss_now);
 		if (unlikely(!tcp_nip_snd_wnd_test(tp, skb, mss_now)))
 			break;
@@ -1220,7 +1220,7 @@ static int tcp_nip_xmit_probe_skb(struct sock *sk, int urgent, int mib)
 	tcp_nip_init_nondata_skb(skb, tp->snd_una - !urgent, TCPHDR_ACK);
 
 	NET_INC_STATS(sock_net(sk), mib);
-	DEBUG("[nip]%s: send probe packet!\n", __func__);
+	DEBUG("[nip]%s: send probe packet!", __func__);
 	return tcp_nip_transmit_skb(sk, skb, 0, (__force gfp_t)0);
 }
 
@@ -1247,7 +1247,7 @@ int tcp_nip_write_wakeup(struct sock *sk, int mib)
 			err = tcp_fragment(sk, TCP_FRAG_IN_WRITE_QUEUE,
 					   skb, seg_size, mss, GFP_ATOMIC);
 			if (err) {
-				DEBUG("[nip]:tcp_fragment return err = %d!\n", err);
+				DEBUG("[nip]:tcp_fragment return err = %d!", err);
 				return -1;
 			}
 		}

@@ -398,7 +398,7 @@ int nip_addrconf_add_ifaddr(struct net *net, void __user *arg)
 	}
 
 	if (nip_addr_invalid(&ireq.ifrn_addr)) {
-		DEBUG("%s: nip addr invalid.", __func__);
+		DEBUG("%s: nip addr invalid, bitlen=%u.", __func__, ireq.ifrn_addr.bitlen);
 		return -EFAULT;
 	}
 
@@ -431,7 +431,7 @@ int nip_addrconf_del_ifaddr(struct net *net, void __user *arg)
 	}
 
 	if (nip_addr_invalid(&ireq.ifrn_addr)) {
-		DEBUG("%s: nip addr invalid.", __func__);
+		DEBUG("%s: nip addr invalid, bitlen=%u.", __func__, ireq.ifrn_addr.bitlen);
 		return -EFAULT;
 	}
 
