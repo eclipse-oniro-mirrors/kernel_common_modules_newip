@@ -578,7 +578,7 @@ int nip_route_ioctl(struct net *net, unsigned int cmd, struct nip_rtmsg *rtmsg)
 
 	if (cfg.fc_flags & RTF_GATEWAY) {
 		if (nip_addr_invalid(&cfg.fc_gateway)) {
-			DEBUG("%s: nip gateway daddr invalid, bitlen=%u", 
+			DEBUG("%s: nip gateway daddr invalid, bitlen=%u",
 			      __func__, cfg.fc_gateway.bitlen);
 			return -EFAULT;
 		}

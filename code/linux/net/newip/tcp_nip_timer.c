@@ -205,9 +205,9 @@ void tcp_nip_probe_timer(struct sock *sk)
 	}
 
 	if (icsk->icsk_probes_out >= max_probes) {
-abort:		pr_crit("%s close session, icsk_backoff=%u, max_probes=%u",
+abort:		tcp_nip_write_err(sk);
+		pr_crit("%s close session, icsk_backoff=%u, max_probes=%u",
 			__func__, icsk->icsk_backoff, max_probes);
-		tcp_nip_write_err(sk);
 	} else {
 		/* Only send another probe if we didn't close things up. */
 		tcp_nip_send_probe0(sk);

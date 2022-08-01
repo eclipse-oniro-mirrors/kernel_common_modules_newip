@@ -692,12 +692,12 @@ void tcp_nip_keepalive_enable(struct sock *sk)
 					    g_nip_keepalive_intvl,
 					    g_nip_keepalive_probes);
 	if (ret != 0) {
-		pr_crit("%s fail, ka_time=%u, ka_probes=%u, ka_intvl=%u",__func__,
+		pr_crit("%s fail, ka_time=%u, ka_probes=%u, ka_intvl=%u", __func__,
 			tp->keepalive_time, tp->keepalive_probes, tp->keepalive_intvl);
 		return;
 	}
 
-	pr_crit("%s ok, ka_time=%u, ka_probes=%u, ka_intvl=%u",__func__,
+	pr_crit("%s ok, ka_time=%u, ka_probes=%u, ka_intvl=%u", __func__,
 		tp->keepalive_time, tp->keepalive_probes, tp->keepalive_intvl);
 	tp->nip_keepalive_enable = true;
 }
@@ -1565,7 +1565,7 @@ int tcp_nip_disconnect(struct sock *sk, int flags)
 
 struct sock *ninet_csk_accept(struct sock *sk, int flags, int *err, bool kern)
 {
-	struct sock * newsk;
+	struct sock *newsk;
 	u32 sk_ack_backlog_last = READ_ONCE(sk->sk_ack_backlog);
 
 	newsk = inet_csk_accept(sk, flags, err, kern);
