@@ -127,7 +127,7 @@ static int tcp_nip_write_timeout(struct sock *sk)
 
 	if (retransmits_nip_timed_out(sk, retry_until,
 				      syn_set ? 0 : icsk->icsk_user_timeout, syn_set)) {
-		DEBUG("%s: tcp retransmit time out!!!\n", __func__);
+		DEBUG("%s: tcp retransmit time out!!!", __func__);
 		tcp_nip_write_err(sk);
 		return 1;
 	}
@@ -184,6 +184,8 @@ void tcp_nip_probe_timer(struct sock *sk)
 	struct inet_connection_sock *icsk = inet_csk(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
 	int max_probes;
+	int icsk_backoff;
+	int icsk_probes_out;
 
 	if (tp->packets_out || !tcp_nip_send_head(sk)) {
 		icsk->icsk_probes_out = 0;
@@ -205,9 +207,11 @@ void tcp_nip_probe_timer(struct sock *sk)
 	}
 
 	if (icsk->icsk_probes_out >= max_probes) {
-abort:		tcp_nip_write_err(sk);
-		pr_crit("%s close session, icsk_backoff=%u, max_probes=%u",
-			__func__, icsk->icsk_backoff, max_probes);
+abort:		icsk_backoff = icsk->icsk_backoff;
+		icsk_probes_out = icsk->icsk_probes_out;
+		tcp_nip_write_err(sk);
+		pr_crit("%s close session, icsk_probes_out=%u, icsk_backoff=%u, max_probes=%u",
+			__func__, icsk_probes_out, icsk_backoff, max_probes);
 	} else {
 		/* Only send another probe if we didn't close things up. */
 		tcp_nip_send_probe0(sk);
@@ -307,7 +311,7 @@ static void tcp_nip_keepalive_timer(struct timer_list *t)
 	}
 
 	if (sk->sk_state == TCP_LISTEN) {
-		pr_err("Hmm... keepalive on a LISTEN\n");
+		pr_err("Hmm... keepalive on a LISTEN");
 		goto out;
 	}
 	tcp_mstamp_refresh(tp);
@@ -317,7 +321,7 @@ static void tcp_nip_keepalive_timer(struct timer_list *t)
 	 */
 	if ((sk->sk_state == TCP_FIN_WAIT2 || sk->sk_state == TCP_CLOSING) &&
 	    sock_flag(sk, SOCK_DEAD)) {
-		DEBUG("%s: finish wait, close sock\n", __func__);
+		DEBUG("%s: finish wait, close sock", __func__);
 		goto death;
 	}
 
