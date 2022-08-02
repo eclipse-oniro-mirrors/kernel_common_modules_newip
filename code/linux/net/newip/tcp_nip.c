@@ -637,7 +637,7 @@ static int tcp_nip_keepalive_para_update(struct sock *sk,
 	/* set keep idle (TCP_KEEPIDLE) */
 	val = keepalive_time;
 	if (val < 1 || val > MAX_NIP_TCP_KEEPIDLE) {
-		pr_crit("%s keepalive_time(%u) invalid.", __func__, val);
+		DEBUG("%s keepalive_time(%u) invalid.", __func__, val);
 		return -EINVAL;
 	}
 
@@ -656,7 +656,7 @@ static int tcp_nip_keepalive_para_update(struct sock *sk,
 	/* set keep intvl (TCP_KEEPINTVL) */
 	val = keepalive_intvl;
 	if (val < 1 || val > MAX_NIP_TCP_KEEPINTVL) {
-		pr_crit("%s keepalive_intvl(%u) invalid.", __func__, val);
+		DEBUG("%s keepalive_intvl(%u) invalid.", __func__, val);
 		return -EINVAL;
 	}
 	tp->keepalive_intvl = val;
@@ -664,7 +664,7 @@ static int tcp_nip_keepalive_para_update(struct sock *sk,
 	/* set keep cnt (TCP_KEEPCNT) */
 	val = keepalive_probes;
 	if (val < 1 || val > MAX_NIP_TCP_KEEPCNT) {
-		pr_crit("%s keepalive_probes(%u) invalid.", __func__, val);
+		DEBUG("%s keepalive_probes(%u) invalid.", __func__, val);
 		return -EINVAL;
 	}
 	tp->keepalive_probes = val;
@@ -674,7 +674,7 @@ static int tcp_nip_keepalive_para_update(struct sock *sk,
 		sk->sk_prot->keepalive(sk, 1);
 		sock_valbool_flag(sk, SOCK_KEEPOPEN, 1);
 	} else {
-		pr_crit("%s keepalive func is null.", __func__);
+		DEBUG("%s keepalive func is null.", __func__);
 	}
 
 	return 0;
@@ -692,13 +692,13 @@ void tcp_nip_keepalive_enable(struct sock *sk)
 					    g_nip_keepalive_intvl,
 					    g_nip_keepalive_probes);
 	if (ret != 0) {
-		pr_crit("%s fail, ka_time=%u, ka_probes=%u, ka_intvl=%u", __func__,
-			tp->keepalive_time, tp->keepalive_probes, tp->keepalive_intvl);
+		DEBUG("%s fail, ka_time=%u, ka_probes=%u, ka_intvl=%u", __func__,
+		      tp->keepalive_time, tp->keepalive_probes, tp->keepalive_intvl);
 		return;
 	}
 
-	pr_crit("%s ok, ka_time=%u, ka_probes=%u, ka_intvl=%u", __func__,
-		tp->keepalive_time, tp->keepalive_probes, tp->keepalive_intvl);
+	DEBUG("%s ok, ka_time=%u, ka_probes=%u, ka_intvl=%u", __func__,
+	      tp->keepalive_time, tp->keepalive_probes, tp->keepalive_intvl);
 	tp->nip_keepalive_enable = true;
 }
 
@@ -717,7 +717,7 @@ void tcp_nip_keepalive_disable(struct sock *sk)
 		sk->sk_prot->keepalive(sk, 0);
 	sock_valbool_flag(sk, SOCK_KEEPOPEN, 0);
 
-	pr_crit("%s ok, idle_ka_probes_out=%u", __func__, g_nip_idle_ka_probes_out);
+	DEBUG("%s ok, idle_ka_probes_out=%u", __func__, g_nip_idle_ka_probes_out);
 	tp->nip_keepalive_enable = false;
 }
 
@@ -1567,11 +1567,11 @@ struct sock *ninet_csk_accept(struct sock *sk, int flags, int *err, bool kern)
 {
 	struct sock *newsk;
 	u32 sk_ack_backlog_last = READ_ONCE(sk->sk_ack_backlog);
+	u32 sk_max_ack_backlog = READ_ONCE(sk->sk_max_ack_backlog);
 
 	newsk = inet_csk_accept(sk, flags, err, kern);
-	DEBUG("%s: accept %s, sk_ack_backlog=%u to %u, sk_max_ack_backlog=%u",
-	      __func__, (newsk ? "ok" : "fail"), sk_ack_backlog_last,
-	      READ_ONCE(sk->sk_ack_backlog), READ_ONCE(sk->sk_max_ack_backlog));
+	DEBUG("%s: accept %s, sk_ack_backlog_last=%u, sk_max_ack_backlog=%u",
+	      __func__, (newsk ? "ok" : "fail"), sk_ack_backlog_last, sk_max_ack_backlog);
 
 	return newsk;
 }

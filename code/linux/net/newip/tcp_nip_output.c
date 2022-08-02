@@ -655,30 +655,24 @@ unsigned int tcp_nip_current_mss(struct sock *sk)
 	const struct dst_entry *dst = __sk_dst_get(sk);
 	u32 mss_now;
 	unsigned int header_len;
-
 	struct tcp_nip_out_options opts;
 
 	mss_now = tp->mss_cache;
-
-	DEBUG("%s: mss_cache %d", __func__, mss_now);
 
 	if (dst) {
 		u32 mtu = dst_mtu(dst);
 
 		if (mtu != inet_csk(sk)->icsk_pmtu_cookie)
 			mss_now = tcp_nip_sync_mss(sk, mtu);
-		DEBUG("%s: mtu %d", __func__, mtu);
 	}
 
-	header_len = tcp_nip_established_options(sk, NULL, &opts) +
-		     sizeof(struct tcphdr);
-
+	header_len = tcp_nip_established_options(sk, NULL, &opts) + sizeof(struct tcphdr);
 	if (header_len != tp->tcp_header_len) {
 		int delta = (int)header_len - tp->tcp_header_len;
 
 		mss_now -= delta;
 	}
-	DEBUG("%s: after sync_mss %d", __func__, mss_now);
+
 	return mss_now;
 }
 

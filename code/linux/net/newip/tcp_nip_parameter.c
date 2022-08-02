@@ -88,7 +88,11 @@ module_param_named(dup_ack_retrans_num, g_dup_ack_retrans_num, int, 0644);
 int g_ack_retrans_num = 5;
 module_param_named(ack_retrans_num, g_ack_retrans_num, int, 0644);
 
-int g_dup_ack_snd_max = 6;
+int g_dup_ack_snd_max = 500;   /*
+				* fix session auto close
+				* Resolve multithreaded stability use cases to
+				* test individual socket disconnections
+				*/
 module_param_named(dup_ack_snd_max, g_dup_ack_snd_max, int, 0644);
 
 /*********************************************************************************************/

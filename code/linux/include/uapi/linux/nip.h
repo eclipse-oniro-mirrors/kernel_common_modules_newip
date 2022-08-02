@@ -24,7 +24,6 @@ struct nip_ifreq {
  * v4: include\linux\socket.h --> sockaddr (16Byte)
  */
 #define POD_SOCKADDR_SIZE 3
-#pragma pack(1)
 struct sockaddr_nin {
 	unsigned short sin_family; /* [2Byte] AF_NINET */
 	unsigned short sin_port;   /* [2Byte] Transport layer port, big-endian */
@@ -32,7 +31,6 @@ struct sockaddr_nin {
 
 	unsigned char sin_zero[POD_SOCKADDR_SIZE]; /* [3Byte] Byte alignment */
 };
-#pragma pack()
 
 struct nip_devreq {
 	char	nip_ifr_name[IFNAMSIZ];	/* if name, e.g. "eth0", "wlan0" */
