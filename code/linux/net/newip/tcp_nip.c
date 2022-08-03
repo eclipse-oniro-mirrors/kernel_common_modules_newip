@@ -165,6 +165,7 @@ void tcp_nip_close(struct sock *sk, long timeout)
 	struct sk_buff *skb;
 	int data_was_unread = 0;
 	int state;
+	u32 sk_ack_backlog;
 
 	lock_sock(sk);
 	sk->sk_shutdown = SHUTDOWN_MASK;
@@ -174,8 +175,11 @@ void tcp_nip_close(struct sock *sk, long timeout)
 	if (sk->sk_state == TCP_LISTEN) {
 		tcp_set_state(sk, TCP_CLOSE);
 
+		sk_ack_backlog = READ_ONCE(sk->sk_ack_backlog);
 		inet_csk_listen_stop(sk);
-
+		DEBUG("%s: sk_state CLOSE, sk_ack_backlog=%u to %u, sk_max_ack_backlog=%u",
+		      __func__, sk_ack_backlog, READ_ONCE(sk->sk_ack_backlog),
+		      READ_ONCE(sk->sk_max_ack_backlog));
 		goto adjudge_to_death;
 	}
 
@@ -202,7 +206,7 @@ void tcp_nip_close(struct sock *sk, long timeout)
 		 * TCP_SYN_RECV	-> TCP_FIN_WAIT1 (forget it, it's impossible)
 		 * TCP_CLOSE_WAIT -> TCP_LAST_ACK
 		 */
-		DEBUG("%s: ready to send fin, sk_state:%d\n", __func__, sk->sk_state);
+		DEBUG("%s: ready to send fin, sk_state:%d", __func__, sk->sk_state);
 		tcp_nip_send_fin(sk);
 	}
 
@@ -326,7 +330,7 @@ static int tcp_nip_connect(struct sock *sk, struct sockaddr *uaddr,
 	fln.flowin_oif = sk->sk_bound_dev_if;
 	dst = nip_dst_lookup_flow(sock_net(sk), sk, &fln, NULL);
 	if (IS_ERR(dst)) {
-		DEBUG("%s cannot find dst\n", __func__);
+		DEBUG("%s cannot find dst", __func__);
 		err = PTR_ERR(dst);
 		goto failure;
 	}
@@ -337,13 +341,13 @@ static int tcp_nip_connect(struct sock *sk, struct sockaddr *uaddr,
 	fln.saddr = sk->sk_nip_rcv_saddr;
 
 	if (nip_addr_invalid(&fln.daddr)) {
-		DEBUG("%s: nip daddr invalid.", __func__);
+		DEBUG("%s: nip daddr invalid, bitlen=%u.", __func__, fln.daddr.bitlen);
 		err = -EFAULT;
 		goto failure;
 	}
 
 	if (nip_addr_invalid(&fln.saddr)) {
-		DEBUG("%s: nip saddr invalid.", __func__);
+		DEBUG("%s: nip saddr invalid, bitlen=%u.", __func__, fln.saddr.bitlen);
 		err = -EFAULT;
 		goto failure;
 	}
@@ -409,7 +413,7 @@ static void tcp_nip_send_reset(struct sock *sk, struct sk_buff *skb)
 	if (th->rst)
 		return;
 
-	DEBUG("%s: send RST!\n", __func__);
+	DEBUG("%s: send RST!", __func__);
 
 	if (th->ack)
 		seq = ntohl(th->ack_seq);
@@ -633,7 +637,7 @@ static int tcp_nip_keepalive_para_update(struct sock *sk,
 	/* set keep idle (TCP_KEEPIDLE) */
 	val = keepalive_time;
 	if (val < 1 || val > MAX_NIP_TCP_KEEPIDLE) {
-		pr_crit("%s keepalive_time(%u) invalid.", __func__, val);
+		DEBUG("%s keepalive_time(%u) invalid.", __func__, val);
 		return -EINVAL;
 	}
 
@@ -652,7 +656,7 @@ static int tcp_nip_keepalive_para_update(struct sock *sk,
 	/* set keep intvl (TCP_KEEPINTVL) */
 	val = keepalive_intvl;
 	if (val < 1 || val > MAX_NIP_TCP_KEEPINTVL) {
-		pr_crit("%s keepalive_intvl(%u) invalid.", __func__, val);
+		DEBUG("%s keepalive_intvl(%u) invalid.", __func__, val);
 		return -EINVAL;
 	}
 	tp->keepalive_intvl = val;
@@ -660,7 +664,7 @@ static int tcp_nip_keepalive_para_update(struct sock *sk,
 	/* set keep cnt (TCP_KEEPCNT) */
 	val = keepalive_probes;
 	if (val < 1 || val > MAX_NIP_TCP_KEEPCNT) {
-		pr_crit("%s keepalive_probes(%u) invalid.", __func__, val);
+		DEBUG("%s keepalive_probes(%u) invalid.", __func__, val);
 		return -EINVAL;
 	}
 	tp->keepalive_probes = val;
@@ -670,7 +674,7 @@ static int tcp_nip_keepalive_para_update(struct sock *sk,
 		sk->sk_prot->keepalive(sk, 1);
 		sock_valbool_flag(sk, SOCK_KEEPOPEN, 1);
 	} else {
-		pr_crit("%s keepalive func is null.", __func__);
+		DEBUG("%s keepalive func is null.", __func__);
 	}
 
 	return 0;
@@ -688,11 +692,13 @@ void tcp_nip_keepalive_enable(struct sock *sk)
 					    g_nip_keepalive_intvl,
 					    g_nip_keepalive_probes);
 	if (ret != 0) {
-		pr_crit("%s fail", __func__);
+		DEBUG("%s fail, ka_time=%u, ka_probes=%u, ka_intvl=%u", __func__,
+		      tp->keepalive_time, tp->keepalive_probes, tp->keepalive_intvl);
 		return;
 	}
 
-	pr_crit("%s ok", __func__);
+	DEBUG("%s ok, ka_time=%u, ka_probes=%u, ka_intvl=%u", __func__,
+	      tp->keepalive_time, tp->keepalive_probes, tp->keepalive_intvl);
 	tp->nip_keepalive_enable = true;
 }
 
@@ -711,7 +717,7 @@ void tcp_nip_keepalive_disable(struct sock *sk)
 		sk->sk_prot->keepalive(sk, 0);
 	sock_valbool_flag(sk, SOCK_KEEPOPEN, 0);
 
-	pr_crit("%s ok, idle_ka_probes_out=%u", __func__, g_nip_idle_ka_probes_out);
+	DEBUG("%s ok, idle_ka_probes_out=%u", __func__, g_nip_idle_ka_probes_out);
 	tp->nip_keepalive_enable = false;
 }
 
@@ -860,7 +866,7 @@ int tcp_nip_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
 restart:
 	mss_now = tcp_nip_send_mss(sk, &size_goal, flags);
 
-	DEBUG("%s: tcp_nip_send_mss %d\n", __func__, mss_now);
+	DEBUG("%s: tcp_nip_send_mss %d", __func__, mss_now);
 
 	err = -EPIPE;
 	if (sk->sk_err || (sk->sk_shutdown & SEND_SHUTDOWN))
@@ -902,7 +908,7 @@ restart:
 			if (err)
 				goto do_fault;
 		} else {
-			DEBUG("%s: msg too big! tcp cannot devide packet now\n", __func__);
+			DEBUG("%s: msg too big! tcp cannot devide packet now", __func__);
 			goto out;
 		}
 
@@ -973,7 +979,7 @@ void tcp_nip_cleanup_rbuf(struct sock *sk, int copied)
 	struct sk_buff *skb = skb_peek(&sk->sk_receive_queue);
 
 	WARN(skb && !before(tp->copied_seq, TCP_SKB_CB(skb)->end_seq),
-	     "cleanup rbuf bug: copied %X seq %X rcvnxt %X\n",
+	     "cleanup rbuf bug: copied %X seq %X rcvnxt %X",
 	     tp->copied_seq, TCP_SKB_CB(skb)->end_seq, tp->rcv_nxt);
 
 	if (inet_csk_ack_scheduled(sk)) {
@@ -1055,13 +1061,13 @@ int tcp_nip_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int nonbloc
 			 * shouldn't happen.
 			 */
 			if (WARN(before(*seq, TCP_SKB_CB(skb)->seq),
-				 "TCP recvmsg seq # bug: copied %X, seq %X, rcvnxt %X, fl %X\n",
+				 "TCP recvmsg seq # bug: copied %X, seq %X, rcvnxt %X, fl %X",
 				 *seq, TCP_SKB_CB(skb)->seq, tp->rcv_nxt,
 				 flags))
 				break;
 			offset = *seq - TCP_SKB_CB(skb)->seq;
 			if (unlikely(TCP_SKB_CB(skb)->tcp_flags & TCPHDR_SYN)) {
-				pr_err_once("%s: found a SYN, please report !\n", __func__);
+				pr_err_once("%s: found a SYN, please report !", __func__);
 				offset--;
 			}
 			if (offset < skb->len)
@@ -1072,7 +1078,7 @@ int tcp_nip_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int nonbloc
 			 * be replicated, then MSG_PEEK should be set in flags
 			 */
 			WARN(!(flags & MSG_PEEK),
-			     "TCP recvmsg seq # bug 2: copied %X, seq %X, rcvnxt %X, fl %X\n",
+			     "TCP recvmsg seq # bug 2: copied %X, seq %X, rcvnxt %X, fl %X",
 			     *seq, TCP_SKB_CB(skb)->seq, tp->rcv_nxt, flags);
 		}
 
@@ -1129,7 +1135,7 @@ int tcp_nip_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int nonbloc
 			release_sock(sk);
 			lock_sock(sk);
 		} else {
-			DEBUG("%s: no enough data receive queue, wait\n", __func__);
+			DEBUG("%s: no enough data receive queue, wait", __func__);
 			sk_wait_data(sk, &timeo, last);
 		}
 		continue;
@@ -1137,11 +1143,11 @@ found_ok_skb:
 		used = skb->len - offset;
 		if (len_tmp < used)
 			used = len_tmp;
-		DEBUG("%s: copy data into msg, len=%ld\n", __func__, used);
+		DEBUG("%s: copy data into msg, len=%ld", __func__, used);
 		if (!(flags & MSG_TRUNC)) {
 			err = skb_copy_datagram_msg(skb, offset, msg, used);
 			if (err) {
-				DEBUG("%s: copy data failed!\n", __func__);
+				DEBUG("%s: copy data failed!", __func__);
 				if (!copied)
 					copied = -EFAULT;
 				break;
@@ -1217,7 +1223,7 @@ void tcp_nip_destroy_sock(struct sock *sk)
  */
 static int tcp_nip_do_rcv(struct sock *sk, struct sk_buff *skb)
 {
-	DEBUG("%s: received newip tcp skb, sk_state=%d\n", __func__, sk->sk_state);
+	DEBUG("%s: received newip tcp skb, sk_state=%d", __func__, sk->sk_state);
 
 	if (sk->sk_state == TCP_ESTABLISHED) {
 		tcp_nip_rcv_established(sk, skb, tcp_hdr(skb), skb->len);
@@ -1226,7 +1232,7 @@ static int tcp_nip_do_rcv(struct sock *sk, struct sk_buff *skb)
 
 	/* The connection is established in cookie mode to defend against SYN-flood attacks */
 	if (sk->sk_state == TCP_LISTEN)
-		DEBUG("found TCP_LISTEN SOCK!!!\n");
+		DEBUG("found TCP_LISTEN SOCK!!!");
 
 	if (tcp_nip_rcv_state_process(sk, skb))
 		goto discard;
@@ -1281,7 +1287,7 @@ static bool tcp_nip_add_backlog(struct sock *sk, struct sk_buff *skb)
 	if (unlikely(sk_add_backlog(sk, skb, limit))) {
 		bh_unlock_sock(sk);
 		__NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPBACKLOGDROP);
-		DEBUG("%s: insert backlog fail.\n", __func__);
+		DEBUG("%s: insert backlog fail.", __func__);
 		return true;
 	}
 	return false;
@@ -1371,7 +1377,7 @@ static int tcp_nip_rcv(struct sk_buff *skb)
 	if (!sock_owned_by_user(sk)) {
 		ret = tcp_nip_do_rcv(sk, skb);
 	} else {
-		DEBUG("%s: sock locked by user! put packet into backlog\n",
+		DEBUG("%s: sock locked by user! put packet into backlog",
 		      __func__);
 		if (tcp_nip_add_backlog(sk, skb))
 			goto discard_and_relse;
@@ -1392,7 +1398,7 @@ no_tcp_socket:
 bad_packet:
 	goto discard_it;
 discard_it:
-	DEBUG("%s: drop tcp newip skb and release it\n", __func__);
+	DEBUG("%s: drop tcp newip skb and release it", __func__);
 	kfree_skb(skb);
 	return 0;
 
@@ -1473,7 +1479,7 @@ void tcp_nip_done(struct sock *sk)
 		this_cpu_dec(*sk->sk_prot->orphan_count);
 		local_bh_enable();
 		sock_put(sk);
-		DEBUG("%s: close sock done!!\n", __func__);
+		DEBUG("%s: close sock done!!", __func__);
 	}
 }
 
@@ -1490,12 +1496,17 @@ int tcp_nip_disconnect(struct sock *sk, int flags)
 	struct tcp_sock *tp = tcp_sk(sk);
 	int err = 0;
 	int old_state = sk->sk_state;
+	u32 sk_ack_backlog;
 
 	if (old_state != TCP_CLOSE)
 		tcp_set_state(sk, TCP_CLOSE);
 
 	if (old_state == TCP_LISTEN) {
+		sk_ack_backlog = READ_ONCE(sk->sk_ack_backlog);
 		inet_csk_listen_stop(sk);
+		DEBUG("%s: sk_state CLOSE, sk_ack_backlog=%u to %u, sk_max_ack_backlog=%u",
+		      __func__, sk_ack_backlog, READ_ONCE(sk->sk_ack_backlog),
+		      READ_ONCE(sk->sk_max_ack_backlog));
 	} else if (tcp_nip_need_reset(old_state) ||
 		   (tp->snd_nxt != tp->write_seq &&
 		    (1 << old_state) & (TCPF_CLOSING | TCPF_LAST_ACK))) {
@@ -1552,13 +1563,26 @@ int tcp_nip_disconnect(struct sock *sk, int flags)
 	return err;
 }
 
+struct sock *ninet_csk_accept(struct sock *sk, int flags, int *err, bool kern)
+{
+	struct sock *newsk;
+	u32 sk_ack_backlog_last = READ_ONCE(sk->sk_ack_backlog);
+	u32 sk_max_ack_backlog = READ_ONCE(sk->sk_max_ack_backlog);
+
+	newsk = inet_csk_accept(sk, flags, err, kern);
+	DEBUG("%s: accept %s, sk_ack_backlog_last=%u, sk_max_ack_backlog=%u",
+	      __func__, (newsk ? "ok" : "fail"), sk_ack_backlog_last, sk_max_ack_backlog);
+
+	return newsk;
+}
+
 struct proto tcp_nip_prot = {
 	.name			= "NIP_TCP",
 	.owner			= THIS_MODULE,
 	.close			= tcp_nip_close,
 	.connect		= tcp_nip_connect,
 	.disconnect		= tcp_nip_disconnect,
-	.accept			= inet_csk_accept,
+	.accept			= ninet_csk_accept,
 	.ioctl			= tcp_ioctl,
 	.init			= tcp_nip_init_sock,
 	.destroy		= tcp_nip_destroy_sock,

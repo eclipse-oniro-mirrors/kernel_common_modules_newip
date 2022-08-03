@@ -206,7 +206,7 @@ int ninet_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 		return -EACCES;
 
 	if (nip_bind_addr_check(net, &addr->sin_addr) == false) {
-		DEBUG("%s: binding-addr invalid.", __func__);
+		DEBUG("%s: binding-addr invalid, bitlen=%u.", __func__, addr->sin_addr.bitlen);
 		return -EADDRNOTAVAIL;
 	}
 	lock_sock(sk);

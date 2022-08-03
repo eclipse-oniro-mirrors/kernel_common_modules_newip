@@ -97,7 +97,7 @@ void tcp_nip_fin(struct sock *sk)
 		/* Only TCP_LISTEN and TCP_CLOSE are left, in these
 		 * cases we should never reach this piece of code.
 		 */
-		pr_err("%s: Impossible, sk->sk_state=%d\n",
+		pr_err("%s: Impossible, sk->sk_state=%d",
 		       __func__, sk->sk_state);
 		break;
 	}
@@ -219,7 +219,7 @@ static void tcp_nip_data_queue(struct sock *sk, struct sk_buff *skb)
 	tp->snd_up = tp->snd_up > PKT_DISCARD_MAX ? 0 : tp->snd_up;
 
 	if (TCP_SKB_CB(skb)->seq == TCP_SKB_CB(skb)->end_seq) {
-		DEBUG("%s: no data, only handle ack.\n", __func__);
+		DEBUG("%s: no data, only handle ack.", __func__);
 		__kfree_skb(skb);
 		return;
 	}
@@ -230,7 +230,7 @@ static void tcp_nip_data_queue(struct sock *sk, struct sk_buff *skb)
 	}
 
 	if (!before(TCP_SKB_CB(skb)->seq, tp->rcv_wup + tp->rcv_wnd)) {
-		DEBUG("seq is %u and %u\n", TCP_SKB_CB(skb)->seq, tp->rcv_nxt);
+		DEBUG("seq is %u and %u", TCP_SKB_CB(skb)->seq, tp->rcv_nxt);
 		__kfree_skb(skb);
 		return;
 	}
@@ -256,7 +256,7 @@ out_of_window:
 		if (TCP_SKB_CB(skb)->seq != tp->rcv_nxt)
 			tcp_nip_overlap_handle(tp, skb);
 
-		DEBUG("%s: tcp newip packet received. data len:%d\n", __func__, skb->len);
+		DEBUG("%s: tcp newip packet received. data len:%d", __func__, skb->len);
 
 		__skb_queue_tail(&sk->sk_receive_queue, skb);
 		skb_set_owner_r(skb, sk);
@@ -365,7 +365,7 @@ static inline void tcp_nip_ack_snd_check(struct sock *sk)
 {
 	if (!inet_csk_ack_scheduled(sk)) {
 		/* We sent a data segment already. */
-		DEBUG("We sent a data segment already.!!\n");
+		DEBUG("We sent a data segment already.");
 		return;
 	}
 	__tcp_nip_ack_snd_check(sk, 1);
@@ -408,7 +408,7 @@ static int tcp_nip_clean_rtx_queue(struct sock *sk, ktime_t *skb_snd_tstamp)
 		if (after(scb->end_seq, tp->snd_una)) {
 			if (tcp_skb_pcount(skb) == 1 || !after(tp->snd_una, scb->seq))
 				break;
-			DEBUG("%s: ack error!\n", __func__);
+			DEBUG("%s: ack error!", __func__);
 		} else {
 			prefetchw(skb->next);
 			acked_pcount = tcp_skb_pcount(skb);
@@ -486,7 +486,7 @@ void tcp_nip_parse_mss(struct tcp_options_received *opt_rx,
 	if (opsize == TCPOLEN_MSS && th->syn && !estab) {
 		u16 in_mss = get_unaligned_be16(ptr);
 
-		DEBUG("%s: in_mss %d\n", __func__, in_mss);
+		DEBUG("%s: in_mss %d", __func__, in_mss);
 
 		if (in_mss) {
 			if (opt_rx->user_mss &&
@@ -763,7 +763,7 @@ int tcp_newip_conn_request(struct request_sock_ops *rsk_ops,
 	 * the current request is discarded
 	 */
 	if (inet_csk_reqsk_queue_is_full(sk) && !isn) {
-		DEBUG("inet_csk_reqsk_queue_is_full!!!!!\n");
+		DEBUG("inet_csk_reqsk_queue_is_full!!!!!");
 		goto drop;
 	}
 
@@ -773,7 +773,8 @@ int tcp_newip_conn_request(struct request_sock_ops *rsk_ops,
 	 */
 	if (sk_acceptq_is_full(sk)) {
 		NET_INC_STATS(sock_net(sk), LINUX_MIB_LISTENOVERFLOWS);
-		DEBUG("sk_acceptq_is_full!!!!!\n");
+		DEBUG("%s sk_acceptq_is_full, sk_ack_backlog=%u, sk_max_ack_backlog=%u",
+		      __func__, READ_ONCE(sk->sk_ack_backlog), READ_ONCE(sk->sk_max_ack_backlog));
 		goto drop;
 	}
 
@@ -1112,7 +1113,7 @@ static int tcp_nip_ack(struct sock *sk, const struct sk_buff *skb, int flag)
 	flag |= tcp_nip_ack_update_window(sk, skb, ack, ack_seq);
 
 	if (!prior_packets) {
-		DEBUG("No prior pack and ack is %u\n", ack);
+		DEBUG("No prior pack and ack is %u", ack);
 		if (tcp_nip_send_head(sk))
 			tcp_nip_ack_probe(sk);
 	}
@@ -1189,7 +1190,7 @@ static void tcp_nip_send_dupack(struct sock *sk, const struct sk_buff *skb)
 	    before(TCP_SKB_CB(skb)->seq, tp->rcv_nxt)) {
 		NET_INC_STATS(sock_net(sk), LINUX_MIB_DELAYEDACKLOST);
 	}
-	DEBUG("[nip]%s send dupack!\n", __func__);
+	DEBUG("[nip]%s send dupack!", __func__);
 	tcp_nip_send_ack(sk);
 }
 
@@ -1216,7 +1217,7 @@ static bool tcp_nip_validate_incoming(struct sock *sk, struct sk_buff *skb,
 	 * unexpected packets do not need to be processed, but reply for an ACK
 	 */
 	if (!tcp_nip_sequence(tp, TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq)) {
-		DEBUG("%s receive an err seq and seq is %u, ack is %u\n", __func__,
+		DEBUG("%s receive an err seq and seq is %u, ack is %u", __func__,
 		      TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq);
 		if (!th->rst)
 			tcp_nip_send_dupack(sk, skb);
@@ -1491,7 +1492,7 @@ int tcp_nip_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 		}
 		goto discard;
 	case TCP_SYN_SENT:
-		DEBUG("%s TCP_SYN_SENT!!\n", __func__);
+		DEBUG("%s TCP_SYN_SENT!!", __func__);
 		tp->rx_opt.saw_tstamp = 0;
 		tcp_mstamp_refresh(tp);
 		queued = tcp_nip_rcv_synsent_state_process(sk, skb, th);
@@ -1527,7 +1528,7 @@ int tcp_nip_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 		/* Invoke memory barrier (annotated prior to checkpatch requirements) */
 		smp_mb();
 		tcp_set_state(sk, TCP_ESTABLISHED);
-		DEBUG("TCP_ESTABLISHED!!!!!\n");
+		DEBUG("TCP_ESTABLISHED!!!!!");
 		sk->sk_state_change(sk);
 
 		/* Sets the part to be sent, and the size of the send window */
@@ -1541,7 +1542,7 @@ int tcp_nip_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 		break;
 	case TCP_FIN_WAIT1: {
 		if (tp->snd_una != tp->write_seq) {
-			DEBUG("%s: tp->snd_una != tp->write_seq!!\n", __func__);
+			DEBUG("%s: tp->snd_una != tp->write_seq!!", __func__);
 			break;
 		}
 
@@ -1551,11 +1552,11 @@ int tcp_nip_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 		if (TCP_SKB_CB(skb)->end_seq != TCP_SKB_CB(skb)->seq &&
 		    after(TCP_SKB_CB(skb)->end_seq - th->fin, tp->rcv_nxt)) {
 			tcp_nip_done(sk);
-			DEBUG("%s: received payload packets, call tcp_nip_done.\n", __func__);
+			DEBUG("%s: received payload packets, call tcp_nip_done.", __func__);
 			return 1;
 		}
 
-		DEBUG("%s: TCP_FIN_WAIT1: recvd ack for fin.Wait for fin from other side.\n",
+		DEBUG("%s: TCP_FIN_WAIT1: recvd ack for fin.Wait for fin from other side.",
 		      __func__);
 		inet_csk_reset_keepalive_timer(sk, TCP_NIP_CSK_KEEPALIVE_CYCLE * HZ);
 
@@ -1564,15 +1565,15 @@ int tcp_nip_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 
 	case TCP_CLOSING:
 		if (tp->snd_una == tp->write_seq) {
-			DEBUG("%s: TCP_CLOSING: recvd ack for fin.Ready to destroy.\n", __func__);
+			DEBUG("%s: TCP_CLOSING: recvd ack for fin.Ready to destroy.", __func__);
 			inet_csk_reset_keepalive_timer(sk, TCP_TIMEWAIT_LEN);
 			goto discard;
 		}
 		break;
 	case TCP_LAST_ACK:
-		DEBUG("tcp_nip_rcv_state_process_2: TCP_LAST_ACK\n");
+		DEBUG("tcp_nip_rcv_state_process_2: TCP_LAST_ACK");
 		if (tp->snd_una == tp->write_seq) {
-			DEBUG("%s: LAST_ACK: recvd ack for fin.Directly destroy.\n", __func__);
+			DEBUG("%s: LAST_ACK: recvd ack for fin.Directly destroy.", __func__);
 			tcp_nip_done(sk);
 			goto discard;
 		}
@@ -1581,16 +1582,16 @@ int tcp_nip_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 
 	switch (sk->sk_state) {
 	case TCP_CLOSE_WAIT:
-		DEBUG("%s: into TCP_CLOSE_WAIT, rst = %d, seq = %u, end_seq = %u, rcv_nxt = %u\n",
+		DEBUG("%s: into TCP_CLOSE_WAIT, rst = %d, seq = %u, end_seq = %u, rcv_nxt = %u",
 		      __func__, th->rst, TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->seq, tp->rcv_nxt);
 		fallthrough;
 	case TCP_CLOSING:
 	case TCP_LAST_ACK:
 		if (!before(TCP_SKB_CB(skb)->seq, tp->rcv_nxt)) {
-			DEBUG("%s: break in TCP_LAST_ACK\n", __func__);
+			DEBUG("%s: break in TCP_LAST_ACK", __func__);
 			break;
 		}
-		DEBUG("tcp_nip_rcv_state_process_3: TCP_LAST_ACK_2\n");
+		DEBUG("tcp_nip_rcv_state_process_3: TCP_LAST_ACK_2");
 		fallthrough;
 	case TCP_FIN_WAIT1:
 	case TCP_FIN_WAIT2:
@@ -1601,7 +1602,7 @@ int tcp_nip_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 			if (TCP_SKB_CB(skb)->end_seq != TCP_SKB_CB(skb)->seq &&
 			    after(TCP_SKB_CB(skb)->end_seq - th->fin, tp->rcv_nxt)) {
 				tcp_nip_reset(sk);
-				DEBUG("%s: call tcp_nip_reset\n", __func__);
+				DEBUG("%s: call tcp_nip_reset", __func__);
 				return 1;
 			}
 		}

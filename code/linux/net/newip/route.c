@@ -264,7 +264,7 @@ void nip_route_input(struct sk_buff *skb)
 	};
 
 	if (nip_addr_eq(&fln.daddr, &nip_broadcast_addr_arp)) {
-		DEBUG("%s: recv broadcast packet!\n", __func__);
+		DEBUG("%s: recv broadcast packet!", __func__);
 		dst_hold(&net->newip.nip_broadcast_entry->dst);
 		skb_dst_set(skb,
 			    (struct dst_entry *)net->newip.nip_broadcast_entry);
@@ -337,11 +337,11 @@ struct nip_rt_info *nip_pol_route(struct net *net, struct nip_fib_table *table,
 	rt->dst.__use++;
 	pcpu_rt = nip_rt_get_pcpu_route(rt);
 
-	DEBUG("%s: cpu id = %d\n", __func__, smp_processor_id());
+	DEBUG("%s: cpu id = %d", __func__, smp_processor_id());
 
 	if (pcpu_rt) {
 		rcu_read_unlock_bh();
-		DEBUG("%s: pcpu found!\n", __func__);
+		DEBUG("%s: pcpu found!", __func__);
 	} else {
 		dst_hold(&rt->dst);
 		rcu_read_unlock_bh();
@@ -349,7 +349,7 @@ struct nip_rt_info *nip_pol_route(struct net *net, struct nip_fib_table *table,
 		dst_release(&rt->dst);
 	}
 
-	DEBUG("%s: rt dst.__refcnt = %d ; pcpu dst.__refcnt = %d\n", __func__,
+	DEBUG("%s: rt dst.__refcnt = %d ; pcpu dst.__refcnt = %d", __func__,
 	      atomic_read(&rt->dst.__refcnt),
 	      atomic_read(&pcpu_rt->dst.__refcnt));
 	return pcpu_rt;
@@ -362,7 +362,7 @@ bool nip_bind_addr_check(struct net *net,
 	struct nip_fib_table *fib_tbl = net->newip.nip_fib_local_tbl;
 
 	if (nip_addr_invalid(addr)) {
-		DEBUG("%s: binding-addr invalid.", __func__);
+		DEBUG("%s: binding-addr invalid, bitlen=%u.", __func__, addr->bitlen);
 		return false;
 	}
 
@@ -571,13 +571,15 @@ int nip_route_ioctl(struct net *net, unsigned int cmd, struct nip_rtmsg *rtmsg)
 
 	rtmsg_to_fibni_config(net, rtmsg, &cfg);
 	if (nip_addr_invalid(&cfg.fc_dst)) {
-		DEBUG("%s: nip daddr invalid.", __func__);
+		DEBUG("%s: nip daddr invalid, bitlen=%u",
+		      __func__, cfg.fc_dst.bitlen);
 		return -EFAULT;
 	}
 
 	if (cfg.fc_flags & RTF_GATEWAY) {
 		if (nip_addr_invalid(&cfg.fc_gateway)) {
-			DEBUG("%s: nip gateway daddr invalid.", __func__);
+			DEBUG("%s: nip gateway daddr invalid, bitlen=%u",
+			      __func__, cfg.fc_gateway.bitlen);
 			return -EFAULT;
 		}
 	}
@@ -616,7 +618,7 @@ static void nip_dst_destroy(struct dst_entry *dst)
 	}
 
 	if (from) {
-		DEBUG("%s: from->__refcnt = %d\n", __func__,
+		DEBUG("%s: from->__refcnt = %d", __func__,
 		      atomic_read(&from->__refcnt));
 	}
 	rt->from = NULL;

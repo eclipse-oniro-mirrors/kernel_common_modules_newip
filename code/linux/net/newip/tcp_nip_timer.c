@@ -100,11 +100,12 @@ static bool retransmits_nip_timed_out(struct sock *sk,
 	 * Currently, it determines whether the timeout period is based on
 	 * the retransmission times
 	 */
-	DEBUG("%s: icsk->retransmits=%u\n", __func__,
-	      inet_csk(sk)->icsk_retransmits);
+	DEBUG("%s: icsk->retransmits=%u, boundary=%u", __func__,
+	      inet_csk(sk)->icsk_retransmits, boundary);
 	return inet_csk(sk)->icsk_retransmits > boundary;
 }
 
+#define NIP_RETRY_UNTIL 200 // fix session auto close
 static int tcp_nip_write_timeout(struct sock *sk)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
@@ -125,9 +126,12 @@ static int tcp_nip_write_timeout(struct sock *sk)
 		}
 	}
 
+#ifdef NIP_RETRY_UNTIL
+	retry_until = NIP_RETRY_UNTIL;
+#endif
 	if (retransmits_nip_timed_out(sk, retry_until,
 				      syn_set ? 0 : icsk->icsk_user_timeout, syn_set)) {
-		DEBUG("%s: tcp retransmit time out!!!\n", __func__);
+		DEBUG("%s: tcp retransmit time out!!!", __func__);
 		tcp_nip_write_err(sk);
 		return 1;
 	}
@@ -179,30 +183,45 @@ void tcp_nip_retransmit_timer(struct sock *sk)
 	inet_csk_reset_xmit_timer(sk, ICSK_TIME_RETRANS, icsk->icsk_rto, TCP_RTO_MAX);
 }
 
+#define NIP_MAX_PROBES 2000 // fix session auto close
 void tcp_nip_probe_timer(struct sock *sk)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
 	int max_probes;
+	int icsk_backoff;
+	int icsk_probes_out;
 
 	if (tp->packets_out || !tcp_nip_send_head(sk)) {
 		icsk->icsk_probes_out = 0;
-		DEBUG("[nip]%s packets_out!=0 or send_head=NULL, don't send probe packet.",
+		DEBUG("%s packets_out!=0 or send_head=NULL, don't send probe packet.",
 		      __func__);
 		return;
 	}
 
+#ifdef NIP_MAX_PROBES
+	max_probes = NIP_MAX_PROBES;
+#else
 	max_probes = sock_net(sk)->ipv4.sysctl_tcp_retries2;
+#endif
+
 	if (sock_flag(sk, SOCK_DEAD)) {
 		const bool alive = inet_csk_rto_backoff(icsk, TCP_RTO_MAX) < TCP_RTO_MAX;
 
 		max_probes = tcp_nip_orphan_retries(sk, alive);
-		if (!alive && icsk->icsk_backoff >= max_probes)
+		if (!alive && icsk->icsk_backoff >= max_probes) {
+			DEBUG("%s will close session, icsk_backoff=%u, max_probes=%u",
+			      __func__, icsk->icsk_backoff, max_probes);
 			goto abort;
+		}
 	}
 
 	if (icsk->icsk_probes_out >= max_probes) {
-abort:		tcp_nip_write_err(sk);
+abort:		icsk_backoff = icsk->icsk_backoff;
+		icsk_probes_out = icsk->icsk_probes_out;
+		tcp_nip_write_err(sk);
+		DEBUG("%s close session, icsk_probes_out=%u, icsk_backoff=%u, max_probes=%u",
+		      __func__, icsk_probes_out, icsk_backoff, max_probes);
 	} else {
 		/* Only send another probe if we didn't close things up. */
 		tcp_nip_send_probe0(sk);
@@ -267,7 +286,7 @@ static void tcp_nip_keepalive_timeout(struct sock *sk)
 	u32 keepalive_time = keepalive_time_when(tp);
 
 	if (keepalive_time > HZ) {
-		pr_crit("%s keepalive timeout, disconnect sock.", __func__);
+		DEBUG("%s keepalive timeout, disconnect sock.", __func__);
 		tcp_nip_write_err(sk);
 		return;
 	}
@@ -277,11 +296,11 @@ static void tcp_nip_keepalive_timeout(struct sock *sk)
 		icsk->icsk_probes_out = 0;
 		inet_csk_reset_keepalive_timer(sk, keepalive_time);
 
-		pr_crit("%s ms keepalive scale(%u) < thresh, connect sock continue.",
-			__func__, tp->nip_keepalive_timeout_scale);
+		DEBUG("%s ms keepalive scale(%u) < thresh, connect sock continue.",
+		      __func__, tp->nip_keepalive_timeout_scale);
 	} else {
-		pr_crit("%s ms keepalive timeout(scale=%u), disconnect sock.",
-			__func__, tp->nip_keepalive_timeout_scale);
+		DEBUG("%s ms keepalive timeout(scale=%u), disconnect sock.",
+		      __func__, tp->nip_keepalive_timeout_scale);
 		tcp_nip_write_err(sk);
 	}
 }
@@ -302,7 +321,7 @@ static void tcp_nip_keepalive_timer(struct timer_list *t)
 	}
 
 	if (sk->sk_state == TCP_LISTEN) {
-		pr_err("Hmm... keepalive on a LISTEN\n");
+		pr_err("Hmm... keepalive on a LISTEN");
 		goto out;
 	}
 	tcp_mstamp_refresh(tp);
@@ -312,7 +331,7 @@ static void tcp_nip_keepalive_timer(struct timer_list *t)
 	 */
 	if ((sk->sk_state == TCP_FIN_WAIT2 || sk->sk_state == TCP_CLOSING) &&
 	    sock_flag(sk, SOCK_DEAD)) {
-		DEBUG("%s: finish wait, close sock\n", __func__);
+		DEBUG("%s: finish wait, close sock", __func__);
 		goto death;
 	}
 
