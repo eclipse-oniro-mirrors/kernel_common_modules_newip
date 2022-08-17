@@ -97,8 +97,7 @@ void tcp_nip_fin(struct sock *sk)
 		/* Only TCP_LISTEN and TCP_CLOSE are left, in these
 		 * cases we should never reach this piece of code.
 		 */
-		pr_err("%s: Impossible, sk->sk_state=%d",
-		       __func__, sk->sk_state);
+		DEBUG("%s: Impossible, sk->sk_state=%d", __func__, sk->sk_state);
 		break;
 	}
 
@@ -213,6 +212,8 @@ static void tcp_nip_data_queue(struct sock *sk, struct sk_buff *skb)
 	int mss = tcp_nip_current_mss(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct inet_connection_sock *icsk = inet_csk(sk);
+	u32 cur_win = tcp_receive_window(tp);
+	u32 seq_max = tp->rcv_nxt + cur_win;
 
 	/* Newip Urg_ptr is disabled. Urg_ptr is used to carry the number of discarded packets */
 	tp->snd_up = (TCP_SKB_CB(skb)->seq - tcp_sk(sk)->rcv_nxt) / mss;
@@ -225,38 +226,55 @@ static void tcp_nip_data_queue(struct sock *sk, struct sk_buff *skb)
 	}
 
 	if (TCP_SKB_CB(skb)->seq == tp->rcv_nxt) {
-		if (tcp_receive_window(tp) == 0)
+		if (cur_win == 0) {
+			DEBUG("%s: rcv window is 0.", __func__);
 			goto out_of_window;
+		}
 	}
 
-	if (!before(TCP_SKB_CB(skb)->seq, tp->rcv_wup + tp->rcv_wnd)) {
-		DEBUG("seq is %u and %u", TCP_SKB_CB(skb)->seq, tp->rcv_nxt);
-		__kfree_skb(skb);
-		return;
+	/* Out of window. F.e. zero window probe. */
+	if (!before(TCP_SKB_CB(skb)->seq, seq_max)) {
+		DEBUG("%s: out of rcv win, seq=[%u-%u], rcv_nxt=%u, seq_max=%u",
+		      __func__, TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq,
+		      tp->rcv_nxt, seq_max);
+		goto out_of_window;
 	}
 
 	if (!after(TCP_SKB_CB(skb)->end_seq, tp->rcv_nxt)) {
+		/* A retransmit, 2nd most common case.  Force an immediate ack. */
+		DEBUG("%s: rcv retransmit pkt, seq=[%u-%u], rcv_nxt=%u",
+		      __func__, TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq, tp->rcv_nxt);
 out_of_window:
 		inet_csk_schedule_ack(sk);
-		__kfree_skb(skb);
+		tcp_drop(sk, skb);
 		return;
 	}
 	icsk->icsk_ack.lrcvtime = tcp_jiffies32;
 	__skb_pull(skb, tcp_hdr(skb)->doff * TCP_NUM_4);
 
+	if (cur_win == 0 || after(TCP_SKB_CB(skb)->end_seq, seq_max)) {
+		DEBUG("%s: win lack, drop pkt, seq=[%u-%u], seq_max=%u, rmem_alloc/rcvbuf=[%u:%u]",
+		      __func__, TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq,
+		      seq_max, atomic_read(&sk->sk_rmem_alloc), sk->sk_rcvbuf);
+		/* wake up processes that are blocked for lack of data */
+		sk->sk_data_ready(sk);
+		inet_csk_schedule_ack(sk);
+		tcp_drop(sk, skb);
+		return;
+	}
+
+	/* case1: seq == rcv_next
+	 * case2: seq -- rcv_next -- end_seq ==> rcv_next(seq) -- end_seq
+	 */
 	if (TCP_SKB_CB(skb)->seq == tp->rcv_nxt ||
 	    (before(TCP_SKB_CB(skb)->seq, tp->rcv_nxt) &&
 	     after(TCP_SKB_CB(skb)->end_seq, tp->rcv_nxt))) {
-		if (atomic_read(&sk->sk_rmem_alloc) > sk->sk_rcvbuf) {
-			sk->sk_data_ready(sk);
-			tcp_drop(sk, skb);
-			return;
-		}
-
 		if (TCP_SKB_CB(skb)->seq != tp->rcv_nxt)
 			tcp_nip_overlap_handle(tp, skb);
 
-		DEBUG("%s: tcp newip packet received. data len:%d", __func__, skb->len);
+		DEBUG("%s: newip packet received. seq=[%u-%u], rcv_nxt=%u, skb->len=%u",
+		      __func__, TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq,
+		      tp->rcv_nxt, skb->len);
 
 		__skb_queue_tail(&sk->sk_receive_queue, skb);
 		skb_set_owner_r(skb, sk);
@@ -270,6 +288,11 @@ out_of_window:
 			sk->sk_data_ready(sk);
 		return;
 	}
+
+	DEBUG("%s: newip ofo packet received. seq=[%u-%u], rcv_nxt=%u, skb->len=%u",
+	      __func__, TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq,
+	      tp->rcv_nxt, skb->len);
+
 	tcp_nip_data_queue_ofo(sk, skb);
 }
 
@@ -319,6 +342,7 @@ void tcp_nip_send_delayed_ack(struct sock *sk)
 	if (icsk->icsk_ack.pending & ICSK_ACK_TIMER) {
 		if (time_before_eq(icsk->icsk_ack.timeout,
 				   jiffies + (ato >> TCP_NIP_4BYTE_PAYLOAD))) {
+			DEBUG("%s: ok", __func__);
 			tcp_nip_send_ack(sk);
 			return;
 		}
@@ -326,6 +350,7 @@ void tcp_nip_send_delayed_ack(struct sock *sk)
 		if (!time_before(timeout, icsk->icsk_ack.timeout))
 			timeout = icsk->icsk_ack.timeout;
 	}
+
 	icsk->icsk_ack.pending |= ICSK_ACK_SCHED | ICSK_ACK_TIMER;
 	icsk->icsk_ack.timeout = timeout;
 	sk_reset_timer(sk, &icsk->icsk_delack_timer, timeout);
@@ -351,12 +376,13 @@ static void __tcp_nip_ack_snd_check(struct sock *sk, int ofo_possible)
 			}
 			if (tp->dup_ack_cnt < g_dup_ack_snd_max)
 				tcp_nip_send_ack(sk);
+			else if (tp->dup_ack_cnt % g_dup_ack_snd_max == 0)
+				tcp_nip_send_ack(sk);
 		} else {
 			tcp_nip_send_ack(sk);
 		}
 	} else {
 		/* Else, send delayed ack. */
-		DEBUG("%s: send delayed ack!!", __func__);
 		tcp_nip_send_delayed_ack(sk);
 	}
 }
@@ -389,8 +415,7 @@ void tcp_nip_rearm_rto(struct sock *sk)
 	} else {
 		u32 rto = inet_csk(sk)->icsk_rto;
 
-		inet_csk_reset_xmit_timer(sk, ICSK_TIME_RETRANS, rto,
-					  TCP_RTO_MAX);
+		inet_csk_reset_xmit_timer(sk, ICSK_TIME_RETRANS, rto, TCP_RTO_MAX);
 	}
 }
 
@@ -430,11 +455,7 @@ static int tcp_nip_clean_rtx_queue(struct sock *sk, ktime_t *skb_snd_tstamp)
 		sk_wmem_free_skb(sk, skb);
 	}
 
-	if ((*skb_snd_tstamp != 0) && (tp->rcv_tstamp - *skb_snd_tstamp) >= g_rtt_tstamp_rto_up)
-		icsk->icsk_rto = (unsigned int)(HZ / g_nip_rto_up);
-	else
-		icsk->icsk_rto = (unsigned int)(HZ / g_nip_rto);
-
+	icsk->icsk_rto = (unsigned int)(HZ / g_nip_rto);
 	if (flag & FLAG_ACKED)
 		tcp_nip_rearm_rto(sk);
 	return 0;
@@ -875,6 +896,7 @@ static int tcp_nip_ack_update_window(struct sock *sk, const struct sk_buff *skb,
 		tcp_update_wl(tp, ack_seq);
 
 		if (tp->snd_wnd != nwin) {
+			DEBUG("%s snd_wnd change [%u to %u]", __func__, tp->snd_wnd, nwin);
 			tp->snd_wnd = nwin;
 			tp->pred_flags = 0;
 		}
@@ -893,15 +915,19 @@ static void tcp_nip_ack_probe(struct sock *sk)
 
 	if (!after(TCP_SKB_CB(tcp_nip_send_head(sk))->end_seq, tcp_wnd_end(tp))) {
 		icsk->icsk_backoff = 0;
+		DEBUG("%s stop probe0 timer.", __func__);
 		inet_csk_clear_xmit_timer(sk, ICSK_TIME_PROBE0);
 		/* Socket must be waked up by subsequent tcp_data_snd_check().
 		 * This function is not for random using!
 		 */
 	} else {
 		unsigned long when = tcp_probe0_when(sk, TCP_RTO_MAX);
+		unsigned long base_when = tcp_probe0_base(sk);
+		u8 icsk_backoff = inet_csk(sk)->icsk_backoff;
 
-		inet_csk_reset_xmit_timer(sk, ICSK_TIME_PROBE0,
-					  when, TCP_RTO_MAX);
+		DEBUG("%s start probe0 timer, when=%u, RTO MAX=%u, base_when=%u, icsk_backoff=%u",
+		      __func__, when, TCP_RTO_MAX, base_when, icsk_backoff);
+		inet_csk_reset_xmit_timer(sk, ICSK_TIME_PROBE0, when, TCP_RTO_MAX);
 	}
 }
 
@@ -1111,16 +1137,18 @@ static int tcp_nip_ack(struct sock *sk, const struct sk_buff *skb, int flag)
 		return -1;
 
 	flag |= tcp_nip_ack_update_window(sk, skb, ack, ack_seq);
+	icsk->icsk_probes_out = 0; // probe0 cnt
+	tp->nip_keepalive_out = 0; // keepalive cnt
+	tp->rcv_tstamp = tcp_jiffies32;
 
+	/* maybe zero window probe */
 	if (!prior_packets) {
-		DEBUG("No prior pack and ack is %u", ack);
+		DEBUG("%s: no unack pkt, seq=[%u-%u], rcv_nxt=%u, ack=%u",
+		      __func__, TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq, tp->rcv_nxt, ack);
 		if (tcp_nip_send_head(sk))
 			tcp_nip_ack_probe(sk);
+		return 1;
 	}
-
-	icsk->icsk_probes_out = 0;
-	tp->nip_keepalive_timeout_scale = 0;
-	tp->rcv_tstamp = tcp_jiffies32;
 
 	if (after(ack, prior_snd_una)) {
 		icsk->icsk_retransmits = 0;
@@ -1190,7 +1218,7 @@ static void tcp_nip_send_dupack(struct sock *sk, const struct sk_buff *skb)
 	    before(TCP_SKB_CB(skb)->seq, tp->rcv_nxt)) {
 		NET_INC_STATS(sock_net(sk), LINUX_MIB_DELAYEDACKLOST);
 	}
-	DEBUG("[nip]%s send dupack!", __func__);
+	DEBUG("%s send dup ack.", __func__);
 	tcp_nip_send_ack(sk);
 }
 
@@ -1213,12 +1241,14 @@ static bool tcp_nip_validate_incoming(struct sock *sk, struct sk_buff *skb,
 	bool rst_seq_match = false;
 
 	/* Step 1: check sequence number */
-	/* Check for unexpected packets. For some probe packets,
-	 * unexpected packets do not need to be processed, but reply for an ACK
+	/* 01.Check for unexpected packets. For some probe packets,
+	 *    unexpected packets do not need to be processed, but reply for an ACK.
+	 * 02.Enter this branch when the receive window is 0
 	 */
 	if (!tcp_nip_sequence(tp, TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq)) {
-		DEBUG("%s receive an err seq and seq is %u, ack is %u", __func__,
-		      TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq);
+		DEBUG("%s receive unexpected pkt, drop it. seq=[%u-%u], rec_win=[%u-%u]",
+		      __func__, TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq,
+		      tp->rcv_wup, tp->rcv_nxt + tcp_receive_window(tp));
 		if (!th->rst)
 			tcp_nip_send_dupack(sk, skb);
 		else if (tcp_nip_reset_check(sk, skb))

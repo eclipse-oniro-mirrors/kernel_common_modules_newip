@@ -131,34 +131,8 @@ int nip_getsockopt(struct sock *sk, int level,
 
 /* functions defined in nip_addrconf.c */
 int nip_addrconf_get_ifaddr(struct net *net, unsigned int cmd, void __user *arg);
-/* 0 - No LOG
- * 1 - Logging the kernel (for the official version)
- * 2 - Logs are directly printed on the screen for debugging
- */
-#define __NIP_DEBUG 0
 
-#if __NIP_DEBUG >= 2
-#define TRACE_OUT(fmt, ...)                                \
-	do {                                                   \
-		pr_crit("%s:%s:%d", __FILE__, __func__, __LINE__); \
-		pr_crit(fmt, ##__VA_ARGS__);                       \
-		pr_crit("\n");                                     \
-	} while (0)
-#define TRACE(fmt, ...) pr_crit(fmt, ##__VA_ARGS__)
-#elif __NIP_DEBUG >= 1
-#define TRACE_OUT(fmt, ...)                             \
-	do {		\
-		pr_warn("%s:%s:%d", __FILE__, __func__, __LINE__); \
-		pr_warn(fmt, ##__VA_ARGS__);	\
-		pr_warn("\n");				\
-	} while (0)
-#define TRACE(fmt, ...) pr_warn(fmt, ##__VA_ARGS__)
-#else
-#define TRACE(fmt, ...)
-#define TRACE_OUT(fmt, ...)
-#endif
-
-#define DEBUG(format, ...) TRACE(format, ##__VA_ARGS__)
-#define DEBUG_TRACE(format, ...) TRACE_OUT(format, ##__VA_ARGS__)
+void nip_dbg(const char *fmt, ...);
+#define DEBUG(format, ...) nip_dbg(format, ##__VA_ARGS__)
 
 #endif

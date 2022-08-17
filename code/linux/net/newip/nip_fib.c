@@ -189,7 +189,16 @@ static void nip_fib_clean_hash(struct net *net, struct hlist_head *nip_tb_head,
 
 		hlist_for_each_entry_safe(fn, tmp, h, fib_hlist) {
 			if (func(fn->nip_route_info, arg) < 0) {
-				DEBUG("%s: try to del nip_rt_info\n", __func__);
+				char dst[NIP_8BIT_ADDR_INDEX_MAX] = {0};
+				char gateway[NIP_8BIT_ADDR_INDEX_MAX] = {0};
+
+				nip_addr_to_str(&fn->nip_route_info->rt_dst, dst,
+						NIP_8BIT_ADDR_INDEX_MAX);
+				nip_addr_to_str(&fn->nip_route_info->gateway, gateway,
+						NIP_8BIT_ADDR_INDEX_MAX);
+
+				DEBUG("%s: try to del rt_info, rt_dst=%s, gateway=%s",
+				      __func__, dst, gateway);
 				nip_fib_del(fn->nip_route_info, &info);
 			}
 		}
@@ -271,7 +280,7 @@ int __init nip_fib_init(void)
 	if (!nip_fib_node_kmem)
 		goto out;
 
-	DEBUG("nip_fib_node size is %lu\n",
+	DEBUG("nip_fib_node size is %lu",
 	      sizeof(struct nip_fib_node) + sizeof(struct nip_rt_info));
 
 	ret = register_pernet_subsys(&nip_fib_net_ops);

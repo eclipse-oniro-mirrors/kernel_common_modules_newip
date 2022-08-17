@@ -142,33 +142,19 @@ void __tcp_nip_push_pending_frames(struct sock *sk, unsigned int cur_mss,
 	if (unlikely(sk->sk_state == TCP_CLOSE))
 		return;
 
-	if (tcp_nip_write_xmit(sk, cur_mss, nonagle, 0,
-			       sk_gfp_mask(sk, GFP_ATOMIC))) {
-		DEBUG("%s check probe0 timer!", __func__);
+	if (tcp_nip_write_xmit(sk, cur_mss, nonagle, 0, sk_gfp_mask(sk, GFP_ATOMIC)))
 		tcp_nip_check_probe_timer(sk);
-	}
 }
 
 u32 __nip_tcp_select_window(struct sock *sk)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
-	int mss = tcp_nip_current_mss(sk); // TCP_BASE_MSS
-	int free_space;
-	int allowed_space;
-	int full_space;
+	int mss = tcp_nip_current_mss(sk); /* TCP_BASE_MSS */
+	int allowed_space = tcp_full_space(sk);
+	int full_space = min_t(int, tp->window_clamp, allowed_space); /* Total receive cache */
+	int free_space = tcp_space(sk); /* 3/4 remaining receive cache */
 	int window;
-
-	if (g_rcv_win_max) {
-		allowed_space = g_rcv_win_max;
-		full_space = allowed_space;
-		WRITE_ONCE(sk->sk_rcvbuf, g_nip_rcvbuf);
-		free_space = tcp_space(sk);
-	} else {
-		allowed_space = tcp_full_space(sk);
-		full_space = min_t(int, tp->window_clamp, allowed_space);
-		free_space = tcp_space(sk);
-	}
 
 	if (unlikely(mss > full_space)) {
 		mss = full_space;
@@ -176,12 +162,16 @@ u32 __nip_tcp_select_window(struct sock *sk)
 			return 0;
 	}
 
+	/* receive buffer is half full */
 	if (free_space < (full_space >> 1)) {
 		icsk->icsk_ack.quick = 0;
 
 		free_space = round_down(free_space, 1 << tp->rx_opt.rcv_wscale);
-		if (free_space < (allowed_space >> TCP_NUM_4) || free_space < mss)
+		if (free_space < (allowed_space >> TCP_NUM_4) || free_space < mss) {
+			DEBUG("%s rcv_wnd is 0, [allowed|full|free]space=[%u, %u, %u], mss=%u",
+			      __func__, allowed_space, full_space, free_space, mss);
 			return 0;
+		}
 	}
 
 	if (g_nip_tcp_rcv_win_enable) {
@@ -193,50 +183,94 @@ u32 __nip_tcp_select_window(struct sock *sk)
 		free_space = free_space > g_ssthresh_high ? g_ssthresh_high : free_space;
 	}
 
-	window = tp->rcv_wnd;
+	/* Don't do rounding if we are using window scaling, since the
+	 * scaled window will not line up with the MSS boundary anyway.
+	 */
 	if (tp->rx_opt.rcv_wscale) {
 		window = free_space;
-		if (((window >> tp->rx_opt.rcv_wscale) << tp->rx_opt.rcv_wscale) != window)
-			window = (((window >> tp->rx_opt.rcv_wscale) + 1)
-				  << tp->rx_opt.rcv_wscale);
+
+		/* Advertise enough space so that it won't get scaled away.
+		 * Import case: prevent zero window announcement if
+		 * 1<<rcv_wscale > mss.
+		 */
+		window = ALIGN(window, (1 << tp->rx_opt.rcv_wscale));
+		DEBUG("%s wscale(%u) win change [%u to %u], [allowed|free]space=[%u, %u], mss=%u",
+		      __func__, tp->rx_opt.rcv_wscale, free_space, window,
+		      allowed_space, free_space, mss);
 	} else {
+		window = tp->rcv_wnd;
+		/* Get the largest window that is a nice multiple of mss.
+		 * Window clamp already applied above.
+		 * If our current window offering is within 1 mss of the
+		 * free space we just keep it. This prevents the divide
+		 * and multiply from happening most of the time.
+		 * We also don't do any window rounding when the free space
+		 * is too small.
+		 */
 		if (window <= free_space - mss || window > free_space)
-			window = (free_space / mss) * mss;
+			window = rounddown(free_space, mss);
 		else if (mss == full_space &&
 			 free_space > window + (full_space >> 1))
 			window = free_space;
+		DEBUG("%s win change [%u to %u]", __func__, tp->rcv_wnd, window);
 	}
 	return window;
 }
 
+/* The basic algorithm of window size selection:
+ * 1. Calculate the remaining size of the receiving window cur_win.
+ * 2. Calculate the new receive window size NEW_win, which is 3/4 of the remaining receive
+ *    cache and cannot exceed RCV_SSTHresh.
+ * 3. Select the receiving window size with the larger median value of cur_win and new_win.
+ */
 static u16 nip_tcp_select_window(struct sock *sk)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 	u32 old_win = tp->rcv_wnd;
+	/* The remaining size of the front receive window */
 	u32 cur_win = tcp_receive_window(tp);
+	/* Calculate the size of the new receive window based on the remaining receive cache */
 	u32 new_win = __nip_tcp_select_window(sk);
+	u32 new_win_bak;
 
+	/* Never shrink the offered window */
 	if (new_win < cur_win) {
+		/* Danger Will Robinson!
+		 * Don't update rcv_wup/rcv_wnd here or else
+		 * we will not be able to advertise a zero
+		 * window in time.  --DaveM
+		 *
+		 * Relax Will Robinson.
+		 */
 		if (new_win == 0)
-			NET_INC_STATS(sock_net(sk),
-				      LINUX_MIB_TCPWANTZEROWINDOWADV);
+			NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPWANTZEROWINDOWADV);
+		new_win_bak = new_win;
 		new_win = ALIGN(cur_win, 1 << tp->rx_opt.rcv_wscale);
+		DEBUG("%s when new_win(%u) < cur_win(%u), win change [%u to %u]",
+		      __func__, new_win_bak, cur_win, new_win_bak, new_win);
 	}
 	tp->rcv_wnd = new_win;
 	tp->rcv_wup = tp->rcv_nxt;
 
-	if (!tp->rx_opt.rcv_wscale &&
-	    sock_net(sk)->ipv4.sysctl_tcp_workaround_signed_windows)
+	/* Make sure we do not exceed the maximum possible
+	 * scaled window.
+	 */
+	if (!tp->rx_opt.rcv_wscale && sock_net(sk)->ipv4.sysctl_tcp_workaround_signed_windows)
 		new_win = min(new_win, MAX_TCP_WINDOW);
 	else
 		new_win = min(new_win, (65535U << tp->rx_opt.rcv_wscale));
 
+	/* RFC1323 Scaling Applied.
+	 * Scaling the receive window so that it can represent up to 30 bits
+	 */
+	new_win_bak = new_win;
 	new_win >>= tp->rx_opt.rcv_wscale;
+	DEBUG("%s wscale(%u) win change [%u to %u]",
+	      __func__, tp->rx_opt.rcv_wscale, new_win_bak, new_win);
 	if (new_win == 0) {
 		tp->pred_flags = 0;
 		if (old_win)
-			NET_INC_STATS(sock_net(sk),
-				      LINUX_MIB_TCPTOZEROWINDOWADV);
+			NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPTOZEROWINDOWADV);
 	} else if (old_win == 0) {
 		NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPFROMZEROWINDOWADV);
 	}
@@ -462,6 +496,7 @@ static int __tcp_nip_transmit_skb(struct sock *sk, struct sk_buff *skb,
 	int err = 0;
 	__be16 len;
 	unsigned short check = 0;
+	bool ack;
 
 	if (skb->tstamp == 0)
 		skb->tstamp = tcp_jiffies32;
@@ -506,10 +541,7 @@ static int __tcp_nip_transmit_skb(struct sock *sk, struct sk_buff *skb,
 	skb_set_hash_from_sk(skb, sk);
 	/* Increase allocated memory */
 	refcount_add(skb->truesize, &sk->sk_wmem_alloc);
-	DEBUG("th->inet_sport=%u, th->inet_dport=%u",
-	      ntohs(inet->inet_sport), ntohs(inet->inet_dport));
-	DEBUG("sk->sk_rcvbuf=%d, sk->sk_rmem_alloc=%d",
-	      sk->sk_rcvbuf, atomic_read(&sk->sk_rmem_alloc));
+
 	/* Build TCP header and checksum it. */
 	th = (struct tcphdr *)skb->data;
 	th->source		= inet->inet_sport;
@@ -535,9 +567,14 @@ static int __tcp_nip_transmit_skb(struct sock *sk, struct sk_buff *skb,
 
 	/* Window Settings */
 	if (likely(!(tcb->tcp_flags & TCPHDR_SYN)))
-		th->window  = htons(nip_tcp_select_window(sk));
+		th->window = htons(nip_tcp_select_window(sk));
 	else
-		th->window	= htons(min(tp->rcv_wnd, TCP_NIP_WINDOW_MAX));
+		th->window = htons(min(tp->rcv_wnd, TCP_NIP_WINDOW_MAX));
+
+	ack = tcb->tcp_flags & TCPHDR_ACK;
+	DEBUG("%s sport=%u, dport=%u, win=%u, sk_rcvbuf=%d, sk_rmem_alloc=%d, ack=%u, skb->len=%u",
+	      __func__, ntohs(inet->inet_sport), ntohs(inet->inet_dport), ntohs(th->window),
+	      sk->sk_rcvbuf, atomic_read(&sk->sk_rmem_alloc), ack, skb->len);
 
 	/* Fill in checksum */
 	check = nip_get_output_checksum_tcp(skb, sk->sk_nip_rcv_saddr, sk->sk_nip_daddr);
@@ -618,8 +655,7 @@ int __tcp_nip_connect(struct sock *sk)
 	TCP_INC_STATS(sock_net(sk), TCP_MIB_ACTIVEOPENS);
 
 	/* Timer for repeating the SYN until an answer. */
-	inet_csk_reset_xmit_timer(sk, ICSK_TIME_RETRANS,
-				  inet_csk(sk)->icsk_rto, TCP_RTO_MAX);
+	inet_csk_reset_xmit_timer(sk, ICSK_TIME_RETRANS, inet_csk(sk)->icsk_rto, TCP_RTO_MAX);
 
 	return 0;
 }
@@ -1046,6 +1082,8 @@ static bool tcp_nip_write_xmit(struct sock *sk, unsigned int mss_now, int nonagl
 	struct sk_buff *skb;
 	u32 snd_num = g_nip_tcp_snd_win_enable ? (tp->nip_ssthresh / mss_now) : 0xFFFFFFFF;
 	u32 last_nip_ssthresh = tp->nip_ssthresh;
+	bool snd_wnd_ready;
+	const char *str[] = {"can`t send pkt because no window", "have window to send pkt"};
 
 	tcp_nip_keepalive_enable(sk);
 	tp->idle_ka_probes_out = 0;
@@ -1065,9 +1103,10 @@ static bool tcp_nip_write_xmit(struct sock *sk, unsigned int mss_now, int nonagl
 	}
 
 	while ((skb = tcp_nip_send_head(sk)) && (snd_num--)) {
-		DEBUG("%s:tcp_nip_send_head head found!", __func__);
 		tcp_nip_init_tso_segs(skb, mss_now);
-		if (unlikely(!tcp_nip_snd_wnd_test(tp, skb, mss_now)))
+		snd_wnd_ready = tcp_nip_snd_wnd_test(tp, skb, mss_now);
+		DEBUG("%s %s, skb->len=%u", __func__, (snd_wnd_ready ? str[1] : str[0]), skb->len);
+		if (unlikely(!snd_wnd_ready))
 			break;
 
 		if (unlikely(tcp_nip_transmit_skb(sk, skb, 1, gfp)))
@@ -1197,10 +1236,27 @@ void tcp_nip_release_cb(struct sock *sk)
 	}
 }
 
+enum nip_probe_type {
+	NIP_PROBE0 = 0,
+	NIP_KEEPALIVE = 1,
+	NIP_UNKNOWN = 2,
+	NIP_PROBE_MAX,
+};
+
 static int tcp_nip_xmit_probe_skb(struct sock *sk, int urgent, int mib)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct sk_buff *skb;
+	int ret;
+	int probe_type;
+	const char *str[NIP_PROBE_MAX] = {"probe0", "keepalive", "unknown"};
+
+	if (mib == LINUX_MIB_TCPWINPROBE)
+		probe_type = NIP_PROBE0;
+	else if (mib == LINUX_MIB_TCPKEEPALIVE)
+		probe_type = NIP_KEEPALIVE;
+	else
+		probe_type = NIP_UNKNOWN;
 
 	/* We don't queue it, tcp_transmit_skb() sets ownership. */
 	skb = alloc_skb(MAX_TCP_HEADER,
@@ -1214,8 +1270,9 @@ static int tcp_nip_xmit_probe_skb(struct sock *sk, int urgent, int mib)
 	tcp_nip_init_nondata_skb(skb, tp->snd_una - !urgent, TCPHDR_ACK);
 
 	NET_INC_STATS(sock_net(sk), mib);
-	DEBUG("[nip]%s: send probe packet!", __func__);
-	return tcp_nip_transmit_skb(sk, skb, 0, (__force gfp_t)0);
+	ret = tcp_nip_transmit_skb(sk, skb, 0, (__force gfp_t)0);
+	DEBUG("%s: send %s probe packet, ret=%d", __func__, str[probe_type], ret);
+	return ret;
 }
 
 int tcp_nip_write_wakeup(struct sock *sk, int mib)
@@ -1241,7 +1298,7 @@ int tcp_nip_write_wakeup(struct sock *sk, int mib)
 			err = tcp_fragment(sk, TCP_FRAG_IN_WRITE_QUEUE,
 					   skb, seg_size, mss, GFP_ATOMIC);
 			if (err) {
-				DEBUG("[nip]:tcp_fragment return err = %d!", err);
+				DEBUG("%s tcp_fragment return err=%d", __func__, err);
 				return -1;
 			}
 		}
@@ -1261,31 +1318,47 @@ void tcp_nip_send_probe0(struct sock *sk)
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct net *net = sock_net(sk);
 	unsigned long probe_max;
-	int err;
+	int when;
 	/* An ACK packet with snd_UNa-1 and length 0 is sent as a zero-window detection packet */
-	err = tcp_nip_write_wakeup(sk, LINUX_MIB_TCPWINPROBE);
+	int err = tcp_nip_write_wakeup(sk, LINUX_MIB_TCPWINPROBE);
 
 	/* If there are packets to be sent on the network and no packets to be
 	 * sent in the send queue, the packet is returned directly
 	 */
 	if (tp->packets_out || !tcp_nip_send_head(sk)) {
 		/* Cancel probe timer, if it is not required. */
+		DEBUG("%s packets_out(%u) not 0 or send_head is NULL, cancel probe0 timer.",
+		      __func__, tp->packets_out);
 		icsk->icsk_probes_out = 0;
 		icsk->icsk_backoff = 0;
 		return;
 	}
 
+	/* Err: 0 succeeded, -1 failed */
 	if (err <= 0) {
 		if (icsk->icsk_backoff < net->ipv4.sysctl_tcp_retries2)
 			icsk->icsk_backoff++;
 		icsk->icsk_probes_out++; /* Number of probes +1 */
 		probe_max = TCP_RTO_MAX;
+		DEBUG("%s probe0 send %s, icsk_probes_out=%u, icsk_backoff=%u, probe_max=%u",
+		      __func__, (!err ? "ok" : "fail"), icsk->icsk_probes_out,
+		      icsk->icsk_backoff, probe_max);
 	} else {
+		/* If packet was not sent due to local congestion,
+		 * do not backoff and do not remember icsk_probes_out.
+		 * Let local senders to fight for local resources.
+		 * Use accumulated backoff yet.
+		 */
 		if (!icsk->icsk_probes_out)
 			icsk->icsk_probes_out = 1;
+
+		/* Makes the zero window probe timer time out faster */
 		probe_max = TCP_RESOURCE_PROBE_INTERVAL;
+		DEBUG("%s probe0 not sent due to local congestion, make timer time out faster",
+		      __func__);
 	}
-	inet_csk_reset_xmit_timer(sk, ICSK_TIME_PROBE0,
-				  tcp_probe0_when(sk, probe_max),
-				  TCP_RTO_MAX);
+
+	when = tcp_probe0_when(sk, probe_max);
+	DEBUG("%s restart probe0 timer, when=%u, probe_max=%u", __func__, when, probe_max);
+	inet_csk_reset_xmit_timer(sk, ICSK_TIME_PROBE0, when, TCP_RTO_MAX);
 }
