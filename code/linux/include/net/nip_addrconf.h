@@ -26,6 +26,7 @@ int nip_dev_get_saddr(struct net *net, const struct net_device *dev,
 
 int nip_addrconf_init(void);
 void nip_addrconf_cleanup(void);
+void nip_addr_to_str(const struct nip_addr *addr, unsigned char *buf, int buf_len);
 
 /**
  * __nin_dev_get - get ninet_dev pointer from netdevice

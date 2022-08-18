@@ -31,17 +31,13 @@ module_param_named(af_ninet, g_af_ninet, int, 0444);
 int g_nip_rto = 50;
 module_param_named(nip_rto, g_nip_rto, int, 0644);
 
-/* RTT RTO of a large delay scenario */
-int g_nip_rto_up = 100;
-module_param_named(nip_rto_up, g_nip_rto_up, int, 0644);
-
 /*********************************************************************************************/
 /*                            TCP sending and receiving buffer configuration                 */
 /*********************************************************************************************/
 int g_nip_sndbuf = 1050000; // 1M
 module_param_named(nip_sndbuf, g_nip_sndbuf, int, 0644);
 
-int g_nip_rcvbuf = 3000000; // 3M
+int g_nip_rcvbuf = 2000000; // 2M
 module_param_named(nip_rcvbuf, g_nip_rcvbuf, int, 0644);
 
 /*********************************************************************************************/
@@ -67,17 +63,6 @@ int g_nip_ssthresh_reset = 10000000; // 10M
 module_param_named(nip_ssthresh_reset, g_nip_ssthresh_reset, int, 0644);
 
 /*********************************************************************************************/
-/*                            Enables the debugging of special scenarios                     */
-/*********************************************************************************************/
-/* Debugging of threshold change */
-int g_rtt_ssthresh_debug;
-module_param_named(rtt_ssthresh_debug, g_rtt_ssthresh_debug, int,  0644);
-
-/* Debugging of packet retransmission after ACK */
-int g_ack_retrans_debug;
-module_param_named(ack_retrans_debug, g_ack_retrans_debug, int,  0644);
-
-/*********************************************************************************************/
 /*                            Retransmission parameters after ACK                            */
 /*********************************************************************************************/
 /* Three DUP ACK packets indicates the number of retransmission packets */
@@ -88,11 +73,7 @@ module_param_named(dup_ack_retrans_num, g_dup_ack_retrans_num, int, 0644);
 int g_ack_retrans_num = 5;
 module_param_named(ack_retrans_num, g_ack_retrans_num, int, 0644);
 
-int g_dup_ack_snd_max = 500;   /*
-				* fix session auto close
-				* Resolve multithreaded stability use cases to
-				* test individual socket disconnections
-				*/
+int g_dup_ack_snd_max = 6;
 module_param_named(dup_ack_snd_max, g_dup_ack_snd_max, int, 0644);
 
 /*********************************************************************************************/
@@ -143,13 +124,10 @@ module_param_named(ssthresh_low_min, g_ssthresh_low_min, int, 0644);
 int g_ssthresh_high_step = 1;
 module_param_named(ssthresh_high_step, g_ssthresh_high_step, int, 0644);
 
-int g_rcv_win_max = 512000;
-module_param_named(rcv_win_max, g_rcv_win_max, int, 0644);
-
 /*********************************************************************************************/
 /*                            keepalive parameters                                           */
 /*********************************************************************************************/
-int g_nip_idle_ka_probes_out = 200;
+int g_nip_idle_ka_probes_out = 20;
 module_param_named(nip_idle_ka_probes_out, g_nip_idle_ka_probes_out, int, 0644);
 
 int g_nip_keepalive_time = 25;
@@ -158,14 +136,8 @@ module_param_named(nip_keepalive_time, g_nip_keepalive_time, int, 0644);
 int g_nip_keepalive_intvl = 25;
 module_param_named(nip_keepalive_intvl, g_nip_keepalive_intvl, int, 0644);
 
-int g_nip_keepalive_probes = 255;
-module_param_named(nip_keepalive_probes, g_nip_keepalive_probes, int, 0644);
-
-/*********************************************************************************************/
-/*                            zero probeparameters                                           */
-/*********************************************************************************************/
-int g_nip_tcp_zero_probe = 20;
-module_param_named(nip_tcp_zero_probe, g_nip_tcp_zero_probe, int, 0644);
+int g_nip_keepalive_time_short_pkt = 150;
+module_param_named(nip_keepalive_time_short_pkt, g_nip_keepalive_time_short_pkt, int, 0644);
 
 /*********************************************************************************************/
 /*                            window mode parameters                                         */
@@ -175,4 +147,19 @@ module_param_named(nip_tcp_snd_win_enable, g_nip_tcp_snd_win_enable, bool, 0644)
 
 bool g_nip_tcp_rcv_win_enable = true;
 module_param_named(nip_tcp_rcv_win_enable, g_nip_tcp_rcv_win_enable, bool, 0644);
+
+/*********************************************************************************************/
+/*                            nip debug parameters                                           */
+/*********************************************************************************************/
+/* Debugging for control DEBUG */
+bool g_nip_debug;
+module_param_named(nip_debug, g_nip_debug, bool, 0644);
+
+/* Debugging of threshold change */
+int g_rtt_ssthresh_debug;
+module_param_named(rtt_ssthresh_debug, g_rtt_ssthresh_debug, int,  0644);
+
+/* Debugging of packet retransmission after ACK */
+int g_ack_retrans_debug;
+module_param_named(ack_retrans_debug, g_ack_retrans_debug, int,  0644);
 

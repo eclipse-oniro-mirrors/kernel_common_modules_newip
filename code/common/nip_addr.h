@@ -32,6 +32,8 @@
 #define NIP_ADDR_LEN_3 3
 #define NIP_ADDR_LEN_4 4
 #define NIP_ADDR_LEN_5 5
+#define NIP_ADDR_LEN_7 7
+#define NIP_ADDR_LEN_8 8
 
 #define NIP_ADDR_BIT_LEN_8    8
 #define NIP_ADDR_BIT_LEN_16   16
@@ -50,6 +52,7 @@ enum nip_addr_check_value {
 	ADDR_SECOND_MIN_DD = 0xDD,
 	ADDR_SECOND_MIN_F1 = 0x14,    /* f1 14 00 */
 	ADDR_THIRD_MIN_F2 = 0x01,     /* f2 00 01 00 00 */
+	ADDR_THIRD_MIN_F3 = 0x01,     /* F3 0001 0000 0000 */
 };
 
 enum nip_8bit_addr_index {
@@ -95,7 +98,28 @@ struct nip_addr {
 	unsigned char bitlen;
 	struct nip_addr_field v;
 };
+
 #pragma pack()
+
+enum nip_index {
+	INDEX_0 = 0,
+	INDEX_1 = 1,
+	INDEX_2 = 2,
+	INDEX_3 = 3,
+	INDEX_4 = 4,
+	INDEX_5 = 5,
+	INDEX_6 = 6,
+	INDEX_7 = 7,
+	INDEX_8 = 8,
+	INDEX_9 = 9,
+	INDEX_10 = 10,
+	INDEX_11 = 11,
+	INDEX_12 = 12,
+	INDEX_13 = 13,
+	INDEX_14 = 14,
+	INDEX_15 = 15,
+	INDEX_MAX,
+};
 
 extern const struct nip_addr nip_any_addr;
 extern const struct nip_addr nip_broadcast_addr_arp;

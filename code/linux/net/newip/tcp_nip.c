@@ -680,25 +680,65 @@ static int tcp_nip_keepalive_para_update(struct sock *sk,
 	return 0;
 }
 
+#define NIP_PKT_TOTAL_LEN_BOUNDARY 100000  // 100K
+#define NIP_KEEPALIVE_PROBES 255
 void tcp_nip_keepalive_enable(struct sock *sk)
 {
 	int ret;
+	u32 nip_keepalive_time;
+	u32 pkt_len;
 	struct tcp_sock *tp = tcp_sk(sk);
+	struct sk_buff *skb = tcp_nip_send_head(sk);
 
-	if (tp->nip_keepalive_enable)
+	if (!skb)
 		return;
 
-	ret = tcp_nip_keepalive_para_update(sk, g_nip_keepalive_time,
-					    g_nip_keepalive_intvl,
-					    g_nip_keepalive_probes);
-	if (ret != 0) {
-		DEBUG("%s fail, ka_time=%u, ka_probes=%u, ka_intvl=%u", __func__,
-		      tp->keepalive_time, tp->keepalive_probes, tp->keepalive_intvl);
+	pkt_len = NIPCB(skb)->pkt_total_len;
+	nip_keepalive_time = pkt_len < NIP_PKT_TOTAL_LEN_BOUNDARY ?
+			     g_nip_keepalive_time_short_pkt : g_nip_keepalive_time;
+
+	if (tp->nip_keepalive_enable) {
+		/* If keepalive set by setsockopt, backup para and change para to nip para */
+		if (tp->keepalive_time > HZ) {
+			tp->keepalive_time_bak = tp->keepalive_time;
+			tp->keepalive_probes_bak = tp->keepalive_probes;
+			tp->keepalive_intvl_bak = tp->keepalive_intvl;
+
+			DEBUG("%s HZ=%u, change time/probes/intvl [%u, %u, %u] to [%u, %u, %u]",
+			      __func__, HZ, tp->keepalive_time, tp->keepalive_probes,
+			      tp->keepalive_intvl, nip_keepalive_time, NIP_KEEPALIVE_PROBES,
+			      g_nip_keepalive_intvl);
+
+			tp->keepalive_time = nip_keepalive_time;
+			tp->keepalive_probes = NIP_KEEPALIVE_PROBES;
+			tp->keepalive_intvl = g_nip_keepalive_intvl;
+			inet_csk_reset_keepalive_timer(sk, tp->keepalive_time);
+		}
 		return;
 	}
 
-	DEBUG("%s ok, ka_time=%u, ka_probes=%u, ka_intvl=%u", __func__,
-	      tp->keepalive_time, tp->keepalive_probes, tp->keepalive_intvl);
+	/* If keepalive set by setsockopt, backup para */
+	if (sock_flag(sk, SOCK_KEEPOPEN)) {
+		tp->keepalive_time_bak = tp->keepalive_time;
+		tp->keepalive_probes_bak = tp->keepalive_probes;
+		tp->keepalive_intvl_bak = tp->keepalive_intvl;
+		DEBUG("%s HZ=%u, backup normal time/probes/intvl [%u, %u, %u]", __func__,
+		      HZ, tp->keepalive_time, tp->keepalive_probes, tp->keepalive_intvl);
+	}
+
+	/* change para to nip para */
+	ret = tcp_nip_keepalive_para_update(sk, nip_keepalive_time,
+					    g_nip_keepalive_intvl,
+					    NIP_KEEPALIVE_PROBES);
+	if (ret != 0) {
+		DEBUG("%s fail, HZ=%u, time/probes/intvl [%u, %u, %u]", __func__,
+		      HZ, tp->keepalive_time, tp->keepalive_probes, tp->keepalive_intvl);
+		return;
+	}
+
+	pr_crit("%s ok, HZ=%u, time/probes/intvl [%u, %u, %u], pkt_total_len=%u",
+		__func__, HZ, tp->keepalive_time, tp->keepalive_probes,
+		tp->keepalive_intvl, pkt_len);
 	tp->nip_keepalive_enable = true;
 }
 
@@ -709,16 +749,65 @@ void tcp_nip_keepalive_disable(struct sock *sk)
 	if (!tp->nip_keepalive_enable)
 		return;
 
+	if (!sock_flag(sk, SOCK_KEEPOPEN)) {
+		tp->nip_keepalive_enable = false;
+		DEBUG("%s ok, HZ=%u, normal ka has disable.", __func__, HZ);
+		return;
+	}
+
 	if (tp->idle_ka_probes_out < g_nip_idle_ka_probes_out)
 		return;
+
+	/* newip keepalive change to normal keepalive */
+	if (tp->keepalive_time_bak) {
+		DEBUG("%s HZ=%u, change normal time/probes/intvl [%u, %u, %u] to [%u, %u, %u].",
+		      __func__, HZ, tp->keepalive_time, tp->keepalive_probes,
+		      tp->keepalive_intvl, tp->keepalive_time_bak, tp->keepalive_probes_bak,
+		      tp->keepalive_intvl_bak);
+		tp->keepalive_time = tp->keepalive_time_bak;
+		tp->keepalive_probes = tp->keepalive_probes_bak;
+		tp->keepalive_intvl = tp->keepalive_intvl_bak;
+		inet_csk_reset_keepalive_timer(sk, tp->keepalive_time);
+		return;
+	}
+
+	tp->keepalive_time_bak = 0;
+	tp->keepalive_probes_bak = 0;
+	tp->keepalive_intvl_bak = 0;
 
 	/* enable keepalive (SO_KEEPALIVE) */
 	if (sk->sk_prot->keepalive)
 		sk->sk_prot->keepalive(sk, 0);
 	sock_valbool_flag(sk, SOCK_KEEPOPEN, 0);
 
-	DEBUG("%s ok, idle_ka_probes_out=%u", __func__, g_nip_idle_ka_probes_out);
+	DEBUG("%s ok, HZ=%u, idle_ka_probes_out=%u", __func__, HZ, g_nip_idle_ka_probes_out);
 	tp->nip_keepalive_enable = false;
+}
+
+static void tcp_nip_rtt_init(struct sock *sk)
+{
+	struct tcp_sock *tp = tcp_sk(sk);
+
+	tp->sacked_out = 0;
+	tp->rcv_tstamp = 0;
+	tp->selective_acks[0].start_seq = 0;
+	tp->selective_acks[0].end_seq = 0;
+	tp->ack_retrans_seq = 0;
+	tp->ack_retrans_num = 0;
+	tp->nip_ssthresh = g_nip_ssthresh_default;
+	tp->nip_ssthresh_reset = 0;
+	tp->last_rcv_nxt = 0;
+	tp->dup_ack_cnt = 0;
+
+	tp->nip_keepalive_enable = false;
+	tp->nip_keepalive_out = 0;
+	tp->idle_ka_probes_out = 0;
+	tp->keepalive_time = 0;
+	tp->keepalive_probes = 0;
+	tp->keepalive_intvl = 0;
+	tp->keepalive_time_bak = 0;
+	tp->keepalive_probes_bak = 0;
+	tp->keepalive_intvl_bak = 0;
 }
 
 /* Function
@@ -749,19 +838,7 @@ static int tcp_nip_init_sock(struct sock *sk)
 	tp->snd_cwnd_clamp = ~0;
 	tp->mss_cache = TCP_MSS_DEFAULT;
 
-	tp->sacked_out = 0;
-	tp->rcv_tstamp = 0;
-	tp->selective_acks[0].start_seq = 0;
-	tp->selective_acks[0].end_seq = 0;
-	tp->ack_retrans_seq = 0;
-	tp->ack_retrans_num = 0;
-	tp->nip_ssthresh = g_nip_ssthresh_default;
-	tp->nip_ssthresh_reset = 0;
-	tp->nip_keepalive_enable = false;
-	tp->idle_ka_probes_out = 0;
-	tp->nip_keepalive_timeout_scale = 0;
-	tp->last_rcv_nxt = 0;
-	tp->dup_ack_cnt = 0;
+	tcp_nip_rtt_init(sk);
 
 	tp->reordering = sock_net(sk)->ipv4.sysctl_tcp_reordering;
 	tp->tsoffset = 0;
@@ -831,8 +908,6 @@ int tcp_nip_send_mss(struct sock *sk, int *size_goal, int flags)
 
 	mss_now = tcp_nip_current_mss(sk);
 	*size_goal = tcp_xmit_size_goal(sk, mss_now, !(flags & MSG_OOB));
-
-	DEBUG("%snip_send_mss%d", __func__, mss_now);
 	return mss_now;
 }
 
@@ -866,7 +941,7 @@ int tcp_nip_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
 restart:
 	mss_now = tcp_nip_send_mss(sk, &size_goal, flags);
 
-	DEBUG("%s: tcp_nip_send_mss %d", __func__, mss_now);
+	DEBUG("%s: mss_now=%d", __func__, mss_now);
 
 	err = -EPIPE;
 	if (sk->sk_err || (sk->sk_shutdown & SEND_SHUTDOWN))
@@ -892,6 +967,7 @@ restart:
 
 		skb->tstamp = 0;
 		process_backlog = true;
+		NIPCB(skb)->pkt_total_len = size;
 
 		skb_nip_entail(sk, skb);
 		copy = mss_now;
@@ -1431,7 +1507,6 @@ static void tcp_nip_early_demux(struct sk_buff *skb)
 					&NIPCB(skb)->srcaddr, th->source,
 					&NIPCB(skb)->dstaddr, ntohs(th->dest), skb->skb_iif);
 	if (sk) {
-		DEBUG("%s: find related sock in ehash.", __func__);
 		skb->sk = sk;
 		skb->destructor = sock_edemux;
 		if (sk_fullsock(sk)) {
@@ -1439,7 +1514,7 @@ static void tcp_nip_early_demux(struct sk_buff *skb)
 
 			if (dst &&
 			    inet_sk(sk)->rx_dst_ifindex == skb->skb_iif) {
-				DEBUG("%s: set dst for skb.", __func__);
+				DEBUG("%s: find sock in ehash, set dst for skb", __func__);
 				skb_dst_set_noref(skb, dst);
 			}
 		}
@@ -1519,6 +1594,8 @@ int tcp_nip_disconnect(struct sock *sk, int flags)
 	tcp_nip_clear_xmit_timers(sk);
 	__skb_queue_purge(&sk->sk_receive_queue);
 	tcp_write_queue_purge(sk);
+
+	tcp_nip_rtt_init(sk);
 
 	inet->inet_dport = 0;
 	sk->sk_shutdown = 0;
@@ -1652,5 +1729,30 @@ void tcp_nip_exit(void)
 {
 	ninet_unregister_protosw(&tcp_nip_protosw);
 	ninet_del_protocol(&tcp_nip_protocol, IPPROTO_TCP);
+}
+
+#define LOG_PRINT_MAX_LEN 256
+void nip_dbg(const char *fmt, ...)
+{
+	u32 pos;
+	char str[LOG_PRINT_MAX_LEN];
+	va_list args;
+	s32 ret;
+
+	if (!g_nip_debug)
+		return;
+
+	memset(str, 0, sizeof(str));
+	pos = strlen(str);
+	(void)memset(&args, 0, sizeof(va_list));
+	va_start(args, fmt);
+	ret = vsnprintf(str, sizeof(str), fmt, args) + 1;
+	va_end(args);
+	if (ret < 0 || ret > sizeof(str)) {
+		pr_crit("nip log len error");
+		return;
+	}
+
+	pr_crit("%s", str);
 }
 

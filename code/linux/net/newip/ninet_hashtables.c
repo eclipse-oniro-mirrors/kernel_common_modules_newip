@@ -222,8 +222,6 @@ struct sock *__ninet_lookup_established(struct net *net,
 
 begin:
 	sk_nulls_for_each_rcu(sk, node, &head->chain) {
-		DEBUG("%s: sk->sk_hash:%u", __func__, sk->sk_hash);
-		DEBUG("%s: dif:%d", __func__, dif);
 		if (sk->sk_hash != hash)
 			continue;
 		if (!NINET_MATCH(sk, net, saddr, daddr, ports, dif))
@@ -237,7 +235,6 @@ begin:
 			sock_gen_put(sk);
 			goto begin;
 		}
-		DEBUG("%s: find sock in ehash table!", __func__);
 		goto found;
 	}
 	if (get_nulls_value(node) != slot)

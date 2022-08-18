@@ -596,20 +596,18 @@ out:
 	return ret;
 
 out_permanent:
-	pr_err("Attempt to override permanent protocol %d\n", protocol);
+	DEBUG("Attempt to override permanent protocol %d", protocol);
 	goto out;
 
 out_illegal:
-	pr_err("Ignoring attempt to register invalid socket type %d\n",
-	       p->type);
+	DEBUG("Ignoring attempt to register invalid socket type %d", p->type);
 	goto out;
 }
 
 void ninet_unregister_protosw(struct inet_protosw *p)
 {
 	if (INET_PROTOSW_PERMANENT & p->flags) {
-		pr_err("Attempt to unregister permanent protocol %d\n",
-		       p->protocol);
+		DEBUG("Attempt to unregister permanent protocol %d", p->protocol);
 	} else {
 		spin_lock_bh(&inetsw_nip_lock);
 		list_del_rcu(&p->list);
@@ -659,14 +657,14 @@ static int __init ninet_init(void)
 
 	sock_skb_cb_check_size(sizeof(struct ninet_skb_parm));
 
-	DEBUG("NET: start to init nip network.\n");
+	DEBUG("NET: start to init nip network.");
 	/* register the socket-side information for ninet_create */
 	for (r = &inetsw_nip[0]; r < &inetsw_nip[SOCK_MAX]; ++r)
 		INIT_LIST_HEAD(r);
 
 	if (disable_nip_mod) {
 		DEBUG("Loaded, but adminstratively disabled,");
-		DEBUG("reboot required to enable\n");
+		DEBUG("reboot required to enable");
 		goto out;
 	}
 
@@ -676,31 +674,31 @@ static int __init ninet_init(void)
 
 	err = proto_register(&nip_udp_prot, 1);
 	if (err) {
-		DEBUG_TRACE("failed to register udp proto!\n");
+		DEBUG("failed to register udp proto!");
 		goto out_udp_register_fail;
 	}
 
 	err = sock_register(&ninet_family_ops);
 	if (err) {
-		DEBUG_TRACE("failed to register newip_family_ops!");
+		DEBUG("failed to register newip_family_ops!");
 		goto out_sock_register_fail;
 	}
 
 	err = register_pernet_subsys(&ninet_net_ops);
 	if (err) {
-		DEBUG_TRACE("failed to register ninet_net_ops!\n");
+		DEBUG("failed to register ninet_net_ops!");
 		goto register_pernet_fail;
 	}
 
 	err = nip_icmp_init();
 	if (err) {
-		DEBUG_TRACE("nip_icmp_init failed!\n");
+		DEBUG("nip_icmp_init failed!");
 		goto nip_icmp_fail;
 	}
 
 	err = nndisc_init();
 	if (err) {
-		DEBUG_TRACE("nndisc_init failed!\n");
+		DEBUG("nndisc_init failed!");
 		goto nndisc_fail;
 	}
 
@@ -714,13 +712,13 @@ static int __init ninet_init(void)
 
 	err = nip_udp_init();
 	if (err) {
-		DEBUG_TRACE("failed to init udp layer!\n");
+		DEBUG("failed to init udp layer!");
 		goto udp_fail;
 	}
 
 	err = tcp_nip_init();
 	if (err) {
-		DEBUG("failed to init tcp layer!\n");
+		DEBUG("failed to init tcp layer!");
 		goto tcp_fail;
 	} else {
 		DEBUG("nip_tcp_init ok!");
@@ -728,7 +726,7 @@ static int __init ninet_init(void)
 
 	err = nip_packet_init();
 	if (err) {
-		DEBUG_TRACE("failed to register to l2 layer!\n");
+		DEBUG("failed to register to l2 layer!");
 		goto nip_packet_fail;
 	}
 
@@ -752,7 +750,7 @@ register_pernet_fail:
 out_sock_register_fail:
 	proto_unregister(&nip_udp_prot);
 out_udp_register_fail:
-	DEBUG_TRACE("newip family init failed!!!\n");
+	DEBUG("newip family init failed!!!");
 	goto out;
 }
 

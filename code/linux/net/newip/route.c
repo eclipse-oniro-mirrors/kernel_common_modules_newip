@@ -759,6 +759,8 @@ static int nip_fib_ifdown(struct nip_rt_info *rt, void *arg)
 	     !rt->rt_idev->cnf.ignore_routes_with_linkdown))
 		return -1;
 
+	DEBUG("%s: don`t del route with %s down, ifindex=%u",
+	      __func__, dev->name, dev->ifindex);
 	return 0;
 }
 
