@@ -81,24 +81,23 @@ enum nip_32bit_addr_index {
 	NIP_32BIT_ADDR_INDEX_MAX,
 };
 
-#define nip_addr_field8 v.u.u8
-#define nip_addr_field16 v.u.u16
-#define nip_addr_field32 v.u.u32
+#define nip_addr_field8 v.u.field8
+#define nip_addr_field16 v.u.field16
+#define nip_addr_field32 v.u.field32
 
 #pragma pack(1)
 struct nip_addr_field {
 	union {
-		unsigned char u8[NIP_8BIT_ADDR_INDEX_MAX];
-		unsigned short u16[NIP_16BIT_ADDR_INDEX_MAX]; /* big-endian */
-		unsigned int u32[NIP_32BIT_ADDR_INDEX_MAX];   /* big-endian */
+		unsigned char   field8[NIP_8BIT_ADDR_INDEX_MAX];
+		unsigned short field16[NIP_16BIT_ADDR_INDEX_MAX]; /* big-endian */
+		unsigned int   field32[NIP_32BIT_ADDR_INDEX_MAX]; /* big-endian */
 	} u;
 };
 
 struct nip_addr {
-	unsigned char bitlen;
+	unsigned char bitlen;	/* The address length is in bit (not byte) */
 	struct nip_addr_field v;
 };
-
 #pragma pack()
 
 enum nip_index {

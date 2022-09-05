@@ -751,16 +751,20 @@ static int nip_fib_ifdown(struct nip_rt_info *rt, void *arg)
 {
 	const struct arg_dev_net *adn = arg;
 	const struct net_device *dev = adn->dev;
+	bool not_same_dev = (rt->dst.dev == dev || !dev);
+	bool not_null_entry = (rt != adn->net->newip.nip_null_entry);
+	bool not_broadcast_entry = (rt != adn->net->newip.nip_broadcast_entry);
+	bool dev_unregister = (dev && netdev_unregistering(dev));
+	bool ignore_route_ifdown = (!rt->rt_idev->cnf.ignore_routes_with_linkdown);
 
-	if ((rt->dst.dev == dev || !dev) &&
-	    rt != adn->net->newip.nip_null_entry &&
-	    rt != adn->net->newip.nip_broadcast_entry &&
-	    ((dev && netdev_unregistering(dev)) ||
-	     !rt->rt_idev->cnf.ignore_routes_with_linkdown))
+	if (not_same_dev && not_null_entry && not_broadcast_entry &&
+	    (dev_unregister || ignore_route_ifdown))
 		return -1;
 
-	DEBUG("%s: don`t del route with %s down, ifindex=%u",
-	      __func__, dev->name, dev->ifindex);
+	DEBUG("%s: don`t del route with %s down, ifindex=%u, not_same_dev=%u, not_null_entry=%u",
+	      __func__, dev->name, dev->ifindex, not_same_dev, not_null_entry);
+	DEBUG("%s: not_broadcast_entry=%u, dev_unregister=%u, ignore_route_ifdown=%u",
+	      __func__, not_broadcast_entry, dev_unregister, ignore_route_ifdown);
 	return 0;
 }
 
