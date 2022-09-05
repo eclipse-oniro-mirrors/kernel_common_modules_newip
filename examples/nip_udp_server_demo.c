@@ -32,6 +32,10 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
+#define __USE_GNU
+#include <sched.h>
+#include <pthread.h>
+
 #include "nip_uapi.h"
 #include "nip_lib.h"
 #include "newip_route.h"
@@ -75,6 +79,7 @@ END:	return NULL;
 int main(int argc, char **argv)
 {
 	int fd;
+	pthread_t th;
 	struct sockaddr_nin si_local;
 
 	fd = socket(AF_NINET, SOCK_DGRAM, IPPROTO_UDP);
