@@ -12,33 +12,49 @@ OHOS_SOURCE_ROOT=$1
 KERNEL_BUILD_ROOT=$2
 PRODUCT_NAME=$3
 KERNEL_VERSION=$4
+NEWIP_SOURCE_ROOT=$OHOS_SOURCE_ROOT/foundation/communication/sfc/newip
 
-PATCH_FILE=$OHOS_SOURCE_ROOT/foundation/communication/sfc/newip/patches/$KERNEL_VERSION/newip.patch
-PRODUCT_SWITCH=$OHOS_SOURCE_ROOT/foundation/communication/sfc/newip/patches/$PRODUCT_NAME.flag
 function main()
 {
-	if [ ! -f $PATCH_FILE ]; then
-		echo "newip not supportted!kernel=$KERNEL_VERSION!"
-		return;
-	fi
-	if [ ! -f $PRODUCT_SWITCH ]; then
-		echo "newip not supportted!product=$PRODUCT_NAME!"
-		return;
-	fi
+	cd $KERNEL_BUILD_ROOT
+
+	ln -s -f $NEWIP_SOURCE_ROOT/code/linux/include/linux/newip_route.h            $KERNEL_BUILD_ROOT/include/linux/newip_route.h
+	ln -s -f $NEWIP_SOURCE_ROOT/code/linux/include/linux/nip.h                    $KERNEL_BUILD_ROOT/include/linux/nip.h
+	ln -s -f $NEWIP_SOURCE_ROOT/code/linux/include/linux/nip_icmp.h               $KERNEL_BUILD_ROOT/include/linux/nip_icmp.h
 	
+	ln -s -f $NEWIP_SOURCE_ROOT/code/linux/include/net/netns/nip.h                $KERNEL_BUILD_ROOT/include/net/netns/nip.h
+	ln -s -f $NEWIP_SOURCE_ROOT/code/linux/include/net/flow_nip.h                 $KERNEL_BUILD_ROOT/include/net/flow_nip.h
+	ln -s -f $NEWIP_SOURCE_ROOT/code/linux/include/net/if_ninet.h                 $KERNEL_BUILD_ROOT/include/net/if_ninet.h
+	ln -s -f $NEWIP_SOURCE_ROOT/code/linux/include/net/ninet_connection_sock.h    $KERNEL_BUILD_ROOT/include/net/ninet_connection_sock.h
+	ln -s -f $NEWIP_SOURCE_ROOT/code/linux/include/net/ninet_hashtables.h         $KERNEL_BUILD_ROOT/include/net/ninet_hashtables.h
+	ln -s -f $NEWIP_SOURCE_ROOT/code/linux/include/net/nip.h                      $KERNEL_BUILD_ROOT/include/net/nip.h
+	ln -s -f $NEWIP_SOURCE_ROOT/code/linux/include/net/nip_addrconf.h             $KERNEL_BUILD_ROOT/include/net/nip_addrconf.h
+	ln -s -f $NEWIP_SOURCE_ROOT/code/linux/include/net/nip_fib.h                  $KERNEL_BUILD_ROOT/include/net/nip_fib.h
+	ln -s -f $NEWIP_SOURCE_ROOT/code/linux/include/net/nip_route.h                $KERNEL_BUILD_ROOT/include/net/nip_route.h
+	ln -s -f $NEWIP_SOURCE_ROOT/code/linux/include/net/nip_udp.h                  $KERNEL_BUILD_ROOT/include/net/nip_udp.h
+	ln -s -f $NEWIP_SOURCE_ROOT/code/linux/include/net/nndisc.h                   $KERNEL_BUILD_ROOT/include/net/nndisc.h
+	ln -s -f $NEWIP_SOURCE_ROOT/code/linux/include/net/tcp_nip.h                  $KERNEL_BUILD_ROOT/include/net/tcp_nip.h
+	ln -s -f $NEWIP_SOURCE_ROOT/code/linux/include/net/transp_nip.h               $KERNEL_BUILD_ROOT/include/net/transp_nip.h
+	
+	ln -s -f $NEWIP_SOURCE_ROOT/code/linux/include/uapi/linux/newip_route.h       $KERNEL_BUILD_ROOT/include/uapi/linux/newip_route.h
+	ln -s -f $NEWIP_SOURCE_ROOT/code/linux/include/uapi/linux/nip.h               $KERNEL_BUILD_ROOT/include/uapi/linux/nip.h
+	ln -s -f $NEWIP_SOURCE_ROOT/code/linux/include/uapi/linux/nip_icmp.h          $KERNEL_BUILD_ROOT/include/uapi/linux/nip_icmp.h
+	
+	ln -s -f $NEWIP_SOURCE_ROOT/code/linux/net/newip                              $KERNEL_BUILD_ROOT/net
+	ln -s -f $NEWIP_SOURCE_ROOT/code/common/nip_addr.c                            $KERNEL_BUILD_ROOT/net/newip/nip_addr.c
+	ln -s -f $NEWIP_SOURCE_ROOT/code/common/nip_addr.h                            $KERNEL_BUILD_ROOT/net/newip/nip_addr.h
+	ln -s -f $NEWIP_SOURCE_ROOT/code/common/nip_addr.h                            $KERNEL_BUILD_ROOT/include/uapi/linux/nip_addr.h
+	ln -s -f $NEWIP_SOURCE_ROOT/code/common/nip_checksum.c                        $KERNEL_BUILD_ROOT/net/newip/nip_checksum.c
+	ln -s -f $NEWIP_SOURCE_ROOT/code/common/nip_checksum.h                        $KERNEL_BUILD_ROOT/net/newip/nip_checksum.h
+	ln -s -f $NEWIP_SOURCE_ROOT/code/common/nip_hdr_decap.c                       $KERNEL_BUILD_ROOT/net/newip/nip_hdr_decap.c
+	ln -s -f $NEWIP_SOURCE_ROOT/code/common/nip_hdr_encap.c                       $KERNEL_BUILD_ROOT/net/newip/nip_hdr_encap.c
+	ln -s -f $NEWIP_SOURCE_ROOT/code/common/nip_hdr.h                             $KERNEL_BUILD_ROOT/net/newip/nip_hdr.h
+	ln -s -f $NEWIP_SOURCE_ROOT/code/common/nip_addr.c                            $KERNEL_BUILD_ROOT/net/newip/nip_addr.c
+	ln -s -f $NEWIP_SOURCE_ROOT/code/common/nip_addr.c                            $KERNEL_BUILD_ROOT/net/newip/nip_addr.c
+	ln -s -f $NEWIP_SOURCE_ROOT/code/common/nip_addr.c                            $KERNEL_BUILD_ROOT/net/newip/nip_addr.c
+	ln -s -f $NEWIP_SOURCE_ROOT/code/common/nip_addr.c                            $KERNEL_BUILD_ROOT/net/newip/nip_addr.c
 
-    cd $KERNEL_BUILD_ROOT
-    echo "patch for newip..."
-    patch -p1 < $PATCH_FILE
-
-	cp -R $OHOS_SOURCE_ROOT/foundation/communication/sfc/newip/code/linux/net/newip  net/
-    cp -arfL $OHOS_SOURCE_ROOT/foundation/communication/sfc/newip/code/linux/include/*  include/
-
-	cp -arfL $OHOS_SOURCE_ROOT/foundation/communication/sfc/newip/code/common/*.h  net/newip/
-	cp -arfL $OHOS_SOURCE_ROOT/foundation/communication/sfc/newip/code/common/*.c  net/newip/
-	ln -s -f $KERNEL_BUILD_ROOT/net/newip/nip_addr.h $KERNEL_BUILD_ROOT/include/uapi/linux/nip_addr.h
-
-    cd -
+	cd -
 }
 
 main

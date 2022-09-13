@@ -13,6 +13,7 @@
  * Based on net/ipv6/inet6_hashtables.c
  * Based on include/net/ip.h
  * Based on include/net/ipv6.h
+ * Based on net/core/secure_seq.c
  */
 #include <linux/module.h>
 #include <linux/random.h>
@@ -22,6 +23,70 @@
 #include <net/inet_hashtables.h>
 #include <net/ninet_hashtables.h>
 #include <net/secure_seq.h>
+
+static siphash_key_t net_secret __read_mostly;
+
+static __always_inline void net_secret_init(void)
+{
+	net_get_random_once(&net_secret, sizeof(net_secret));
+}
+
+#ifdef CONFIG_INET
+static u32 seq_scale(u32 seq)
+{
+	/*	As close as possible to RFC 793, which
+	 *	suggests using a 250 kHz clock.
+	 *	Further reading shows this assumes 2 Mb/s networks.
+	 *	For 10 Mb/s Ethernet, a 1 MHz clock is appropriate.
+	 *	For 10 Gb/s Ethernet, a 1 GHz clock should be ok, but
+	 *	we also need to limit the resolution so that the u32 seq
+	 *	overlaps less than one time per MSL (2 minutes).
+	 *	Choosing a clock of 64 ns period is OK. (period of 274 s)
+	 */
+	return seq + (ktime_get_real_ns() >> 6);
+}
+#endif
+
+__u32 secure_tcp_nip_sequence_number(const __be32 *saddr, const __be32 *daddr,
+				     __be16 sport, __be16 dport)
+{
+	const struct {
+		struct nip_addr saddr;
+		struct nip_addr daddr;
+		__be16 sport;
+		__be16 dport;
+	} __aligned(SIPHASH_ALIGNMENT) combined = {
+		.saddr = *(struct nip_addr *)saddr,
+		.daddr = *(struct nip_addr *)daddr,
+		.sport = sport,
+		.dport = dport,
+	};
+	u32 hash;
+
+	net_secret_init();
+	hash = siphash(&combined, offsetofend(typeof(combined), dport),
+		       &net_secret);
+	return seq_scale(hash);
+}
+EXPORT_SYMBOL_GPL(secure_tcp_nip_sequence_number);
+
+u64 secure_newip_port_ephemeral(const __be32 *saddr, const __be32 *daddr,
+				__be16 dport)
+{
+	const struct {
+		struct nip_addr saddr;
+		struct nip_addr daddr;
+		__be16 dport;
+	} __aligned(SIPHASH_ALIGNMENT) combined = {
+		.saddr = *(struct nip_addr *)saddr,
+		.daddr = *(struct nip_addr *)daddr,
+		.dport = dport,
+	};
+	net_secret_init();
+	return siphash(&combined, offsetofend(typeof(combined), dport),
+		       &net_secret);
+}
+EXPORT_SYMBOL_GPL(secure_newip_port_ephemeral);
 
 static inline u32 nip_portaddr_hash(const struct net *net,
 				    const struct nip_addr *saddr,

@@ -3,6 +3,7 @@
  * Copyright (c) 2022 Huawei Device Co., Ltd.
  *
  * Based on include/linux/ipv6.h
+ * Based on include/net/sock.h
  */
 #ifndef _NIP_H
 #define _NIP_H
@@ -11,6 +12,16 @@
 #include <linux/udp.h>
 #include <linux/tcp.h>
 #include <linux/spinlock.h>
+
+#define ETH_P_NEWIP	0xEADD		/* NIP */
+
+/* struct sock_common __sk_common */
+#define sk_nip_daddr     __sk_common.nip_daddr
+#define sk_nip_rcv_saddr __sk_common.nip_rcv_saddr
+
+/* struct request_sock req */
+#define ir_nip_rmt_addr req.__req_common.nip_daddr
+#define ir_nip_loc_addr req.__req_common.nip_rcv_saddr
 
 struct nip_devconf {
 	__s32 forwarding;

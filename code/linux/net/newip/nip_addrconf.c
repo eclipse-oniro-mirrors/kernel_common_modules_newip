@@ -58,6 +58,28 @@ static struct nip_devconf newip_devconf_dflt __read_mostly = {
 	.ignore_routes_with_linkdown = 0,
 };
 
+/* only match New IP sock
+ * match_sk*_wildcard == true:	NIP_ADDR_ANY equals to any New IP addresses
+ *
+ * match_sk*_wildcard == false: addresses must be exactly the same, i.e.
+ *				NIP_ADDR_ANY only equals to NIP_ADDR_ANY
+ */
+bool nip_rcv_saddr_equal(const struct nip_addr *sk1_rcv_saddr,
+				const struct nip_addr *sk2_rcv_saddr,
+				bool sk2_isnewip,
+				bool match_sk1_wildcard,
+				bool match_sk2_wildcard)
+{
+	if (!sk2_isnewip)
+		return false;
+	if (nip_addr_eq(sk1_rcv_saddr, sk2_rcv_saddr))
+		return true;
+	return (match_sk1_wildcard &&
+		nip_addr_eq(sk1_rcv_saddr, &nip_any_addr)) ||
+		(match_sk2_wildcard &&
+		 nip_addr_eq(sk2_rcv_saddr, &nip_any_addr));
+}
+
 /* Check if link is ready: is it up and is a valid qdisc available */
 static inline bool nip_addrconf_link_ready(const struct net_device *dev)
 {
