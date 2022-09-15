@@ -457,7 +457,7 @@ static int tcp_nip_send_synack(const struct sock *sk, struct dst_entry *dst,
 
 static void tcp_nip_reqsk_destructor(struct request_sock *req)
 {
-	kfree_skb(inet_rsk(req)->nip_pktopts);
+	;
 }
 
 struct request_sock_ops tcp_nip_request_sock_ops __read_mostly = {

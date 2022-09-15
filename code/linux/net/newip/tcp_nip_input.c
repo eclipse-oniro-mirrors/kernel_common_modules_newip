@@ -482,7 +482,6 @@ struct request_sock *ninet_reqsk_alloc(const struct request_sock_ops *ops,
 		struct inet_request_sock *ireq = inet_rsk(req);
 
 		ireq->ireq_opt = NULL;
-		ireq->nip_pktopts = NULL;
 		atomic64_set(&ireq->ir_cookie, 0);
 		ireq->ireq_state = TCP_NEW_SYN_RECV;
 		write_pnet(&ireq->ireq_net, sock_net(sk_listener));

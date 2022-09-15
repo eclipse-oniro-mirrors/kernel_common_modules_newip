@@ -8,7 +8,7 @@
 # NewIP as module will cause a CRASH if you try to unload it
 menuconfig NEWIP
 	tristate "The NewIP protocol"
-	default y
+	default n
 	help
 	Support for NewIP.
 

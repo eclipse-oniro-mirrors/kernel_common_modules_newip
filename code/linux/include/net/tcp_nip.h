@@ -10,6 +10,7 @@
  * Definitions for the NewIP TCP module.
  *
  * Based on include/net/tcp.h
+ * Based on include/linux/tcp.h
  */
 #ifndef _TCP_NIP_H
 #define _TCP_NIP_H
@@ -62,6 +63,9 @@ extern struct proto tcp_nip_prot;
 #define TCP_NIP_CSK_KEEPALIVE_CYCLE 10 /* 1 HZ = 1 seconds */
 
 #define TCP_NIP_WINDOW_MAX 65535U
+
+#define TCP_NIP_WRITE_TIMER_DEFERRED  (TCP_MTU_REDUCED_DEFERRED + 1)
+#define TCP_NIP_DELACK_TIMER_DEFERRED (TCP_NIP_WRITE_TIMER_DEFERRED + 1)
 
 /* init */
 int tcp_nip_init(void);

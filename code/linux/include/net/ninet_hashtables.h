@@ -108,5 +108,14 @@ static inline struct sock *__ninet_lookup_skb(struct inet_hashinfo *hashinfo,
 int ninet_hash_connect(struct inet_timewait_death_row *death_row,
 		       struct sock *sk);
 
+u64 secure_newip_port_ephemeral(const __be32 *saddr, const __be32 *daddr,
+			       __be16 dport);
+__u32 secure_tcp_nip_sequence_number(const __be32 *saddr, const __be32 *daddr,
+				    __be16 sport, __be16 dport);
+
+u32 ninet_ehashfn(const struct net *net,
+	      const struct nip_addr *laddr, const u16 lport,
+	      const struct nip_addr *faddr, const __be16 fport);
+
 #endif /* IS_ENABLED(CONFIG_NEWIP) */
 #endif /* _NINET_HASHTABLES_H */
