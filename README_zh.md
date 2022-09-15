@@ -2,17 +2,22 @@
 
 ## 简介
 
-NewIP支持可变长多语义地址，可变长定制化报头封装，通过精简报文头开销，提升数据传输效率。
+网络差异化技术需求依赖于灵活的地址空间大小。低功耗物联网场景通过降低网络层封装开销为性能受限设备引入网络协议栈，其要求网络协议使用的地址空间尽可能小。高安全承诺网络场景通过将用户身份标识嵌入地址实现网络层安全验证，其要求网络协议使用地址空间尽可能大。目前IPv4与IPv6的地址空间分别为固定的32比特空间和128比特空间。
 
-```
-备注：
-IPv4地址长度固定4字节，IPv6地址长度固定16字节。
-IPv4网络层报头长度20~60字节，IPv6网络层报头长度40字节。
-```
+网络差异化技术需求依赖于灵活的报头封装格式。低功耗物联网场景通过降低网络层封装开销为性能受限设备引入网络协议栈，其要求网络协议封装开销尽可能低。新兴网络场景通过构建自定义封装格式实现定制化的网络能力，要求网络层协议封装字段选择尽可能灵活且具有高可扩展性。目前IPv4与IPv6的报文头封装存在不可变的固定封装字段（IPv4网络层报头长度20~60字节，IPv6网络层报头长度40字节）。
+
+NewIP支持可变长多语义地址，可变长定制化报头封装，通过精简报文头开销，提升数据传输效率。
 
 NewIP灵活极简报文头如下图所示，通过LLC Header中的EtherType = 0xEADD标识。Bitmap是一组由0和1组成的二进制序列，每个二进制位的数值用于表示特定目标特性的存在性。
 
 ![image-20220901152326770](figures/image-20220901152326770.png)
+
+1)	Dispatch：指示封装子类，数值0b0表示其为极简封装子类，长度为1比特；(0b表示后面数值为二进制)。
+
+2)	Bitmap：变长，Bitmap默认为紧跟在Dispatch有效位后面的7比特，Bitmap字段长度可持续扩展。Bitmap最后一位置0表示Bitmap结束，最后一位置1表示Bitmap向后扩展1 Byte，直至最后一位置0。
+3)	Value: 标识字段的值，长度为1 Byte的整数倍，类型及长度由报头字段语义表确定。
+
+
 
 NewIP内核协议栈架构图如下，用户态调用Socket API创建NewIP socket，采用NewIP极简帧头封装进行收发包。
 
@@ -52,7 +57,7 @@ CONFIG_NEWIP=y
 代码编译完成后，通过下面命令可以确认newip协议栈代码是否使能成功。
 
 ```c
-root@nip-server:~/harmony_master/harmony# find out/ -name *nip*.o
+find out/ -name *nip*.o
 out/rk3568/obj/third_party/glib/glib/glib_source/guniprop.o
 out/kernel/OBJ/linux-5.10/net/newip/nip_addrconf_core.o
 out/kernel/OBJ/linux-5.10/net/newip/nip_hdr_decap.o
@@ -70,19 +75,6 @@ out/kernel/OBJ/linux-5.10/net/newip/tcp_nip_output.o
 
 ## 说明
 
-### 报头字段说明
-
-NewIP报文格式由NewIP报头与Payload两部分组成，如下图所示：
-
-![image-20220901155226078](figures/image-20220901155226078.png)
-
-1)	Dispatch：指示封装子类，数值0b0表示其为极简封装子类，长度为1比特；(0b表示后面数值为二进制)。
-
-2)	Bitmap：变长，Bitmap默认为紧跟在Dispatch有效位后面的7比特，Bitmap字段长度可持续扩展。Bitmap最后一位置0表示Bitmap结束，最后一位置1表示Bitmap向后扩展1 Byte，直至最后一位置0。
-2)	Value: 标识字段的值，长度为1 Byte的整数倍，类型及长度由报头字段语义表确定。
-
-
-
 ### 可变长地址格式说明
 
 NewIP采用自解释编码，编码格式如下所示：
@@ -97,7 +89,6 @@ NewIP采用自解释编码，编码格式如下所示：
 | 0xDD       | An 16-bit address, which is 0 + 256 * (0xDD - 0xDD) + the last byte value | 【2字节】221 ~ 255 (0x**DD**DD ~ 0x**DD**FF)                 |
 | 0xDE       | An 16-bit address, which is 0 + 256 * (0xDE - 0xDD) + the last byte value | 【2字节】256 ~ 511 (0x**DE**00 ~ 0x**DE**FF)                 |
 | 0xDF       | An 16-bit address, which is 0 + 256 * (0xDF - 0xDD) + the last byte value | 【2字节】512 ~ 767 (0x**DF**00 ~ 0x**DF**FF)                 |
-|            |                                                              |                                                              |
 | ...        | ...                                                          |                                                              |
 | 0xF0       | An 16-bit address, which is 0 + 256 * (0xF0 - 0xDD) + the last byte value | 【2字节】4864 ~ 5119 (0x**F0**00 ~ 0x**F0**FF)               |
 | 0xF1       | An 16-bit address is followed                                | 【3字节】5120 ~ 65535 (0x**F1** 1400 ~ 0x**F1** FFFF)        |
@@ -189,9 +180,7 @@ NewIP协议socket接口列表如下：
 
 ### 使用说明
 
-NewIP可变长地址配置，路由配置，UDP/TCP收发包demo代码链接如下，NewIP协议栈用户态接口使用方法可以参考demo代码。
-
-https://gitee.com/openharmony-sig/communication_sfc_newip/tree/master/examples
+NewIP可变长地址配置，路由配置，UDP/TCP收发包demo代码链接如下，NewIP协议栈用户态接口使用方法可以参考代码仓demo代码。
 
 | 文件名                | 功能                          |
 | --------------------- | ----------------------------- |
@@ -204,6 +193,8 @@ https://gitee.com/openharmony-sig/communication_sfc_newip/tree/master/examples
 | nip_lib.c             | 接口索引获取等API接口demo代码 |
 
 **基础操作步骤：**
+
+1号开发板 ----- eth / wifi AP ----- 2号开发板，两块开发板通过eth网线或wifi AP连接。
 
 1、将demo代码拷贝到Linux编译机上，make clean，make all编译demo代码。
 
@@ -267,4 +258,32 @@ Received --1661760203  69254 NIP_TCP #      1 sock 3 success:     2/     2/no=  
 ...
 Received --1661760207  86544 NIP_TCP #      9 sock 3 success:    10/    10/no=     9
 ```
+
+### selinux规则说明
+
+用户态进程操作NewIP socket需要添加selinux policy，否则操作会被拦截。
+
+```sh
+# base\security\selinux\sepolicy\ohos_policy\xxx\xxx.te
+# socket 基础操作
+# avc:  denied  { create } for  pid=540 comm="thread_xxx" scontext=u:r:thread_xxx:s0 tcontext=u:r:thread_xxx:s0 tclass=socket permissive=0
+allow thread_xxx thread_xxx:socket { create bind connect listen accept read write shutdown setopt getopt };
+
+# ioctl 操作
+# 操作码在 linux-xxx\include\uapi\linux\sockios.h 中定义
+# 0x8933 : name -> if_index mapping
+# 0x8916 : set PA address
+# 0x890B : add routing table entry
+allowxperm thread_xxx thread_xxx:socket ioctl { 0x8933 0x8916 0x890B };
+```
+
+## 相关仓
+
+[内核子系统](https://gitee.com/openharmony/docs/blob/master/zh-cn/readme/%E5%86%85%E6%A0%B8%E5%AD%90%E7%B3%BB%E7%BB%9F.md)
+
+[kernel_linux_5.10](https://gitee.com/openharmony/kernel_linux_5.10)
+
+[kernel_linux_config](https://gitee.com/openharmony/kernel_linux_config)
+
+[kernel_linux_build](https://gitee.com/openharmony/kernel_linux_build)
 
