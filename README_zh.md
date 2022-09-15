@@ -2,28 +2,22 @@
 
 ## 简介
 
-网络差异化技术需求依赖于灵活的地址空间大小。低功耗物联网场景通过降低网络层封装开销为性能受限设备引入网络协议栈，其要求网络协议使用的地址空间尽可能小。高安全承诺网络场景通过将用户身份标识嵌入地址实现网络层安全验证，其要求网络协议使用地址空间尽可能大。目前IPv4与IPv6的地址空间分别为固定的32比特空间和128比特空间。
+OpenHarmony目前WiFi协议报文，三层报头和地址开销使得报文开销大，传输效率较低。
 
-网络差异化技术需求依赖于灵活的报头封装格式。低功耗物联网场景通过降低网络层封装开销为性能受限设备引入网络协议栈，其要求网络协议封装开销尽可能低。新兴网络场景通过构建自定义封装格式实现定制化的网络能力，要求网络层协议封装字段选择尽可能灵活且具有高可扩展性。目前IPv4与IPv6的报文头封装存在不可变的固定封装字段（IPv4网络层报头长度20~60字节，IPv6网络层报头长度40字节）。
+![image-20220915162621809](figures/image-20220915162621809.png)
 
-NewIP支持可变长多语义地址，可变长定制化报头封装，通过精简报文头开销，提升数据传输效率。
+```
+IPv4地址长度固定4字节，IPv6地址长度固定16字节。
+IPv4网络层报头长度20~60字节，IPv6网络层报头长度40字节。
+```
 
-NewIP灵活极简报文头如下图所示，通过LLC Header中的EtherType = 0xEADD标识。Bitmap是一组由0和1组成的二进制序列，每个二进制位的数值用于表示特定目标特性的存在性。
+NewIP支持**可变长多语义地址**，**可变长定制化报头封装**，通过精简报文头开销，提升数据传输效率。
 
-![image-20220901152326770](figures/image-20220901152326770.png)
-
-1)	Dispatch：指示封装子类，数值0b0表示其为极简封装子类，长度为1比特；(0b表示后面数值为二进制)。
-
-2)	Bitmap：变长，Bitmap默认为紧跟在Dispatch有效位后面的7比特，Bitmap字段长度可持续扩展。Bitmap最后一位置0表示Bitmap结束，最后一位置1表示Bitmap向后扩展1 Byte，直至最后一位置0。
-3)	Value: 标识字段的值，长度为1 Byte的整数倍，类型及长度由报头字段语义表确定。
-
-
+## 系统架构
 
 NewIP内核协议栈架构图如下，用户态调用Socket API创建NewIP socket，采用NewIP极简帧头封装进行收发包。
 
 ![image-20220901152539801](figures/image-20220901152539801.png)
-
-
 
 ## 目录
 
@@ -31,17 +25,17 @@ NewIP内核协议栈主要代码目录结构如下：
 
 ```
 /foundation/communication/sfc/newip
-├── patches
-│   └── linux-5.10        # NewIP内核侵入式修改对应的补丁文件
-└── code
-    ├── common            # NewIP 通用代码
-    └── linux             # NewIP Linux内核代码
-        ├── include       # NewIP 头文件
-        │   ├── linux
-        │   ├── net
-        │   └── uapi
-        └── net
-            └── newip     # NewIP 功能代码
+├── examples              # NewIP 用户态样例代码
+├── code
+│   ├── common            # NewIP 通用代码
+│   └── linux             # NewIP Linux内核代码
+│       ├── include       # NewIP 头文件
+│       │   ├── linux
+│       │   ├── net
+│       │   └── uapi
+│       └── net
+│           └── newip     # NewIP 功能代码
+└── figures               # ReadMe 内嵌图例
 ```
 
 ## 编译构建
@@ -75,7 +69,18 @@ out/kernel/OBJ/linux-5.10/net/newip/tcp_nip_output.o
 
 ## 说明
 
-### 可变长地址格式说明
+### 可变长报头格式
+
+NewIP灵活极简报文头如下图所示，通过LLC Header中的EtherType = 0xEADD标识。Bitmap是一组由0和1组成的二进制序列，每个二进制位的数值用于表示特定目标特性的存在性。
+
+![image-20220915140627223](figures/image-20220915140627223.png)
+
+1)	Dispatch：指示封装子类，数值0b0表示其为极简封装子类，长度为1比特；(0b表示后面数值为二进制)。
+
+2)	Bitmap：变长，Bitmap默认为紧跟在Dispatch有效位后面的7比特，Bitmap字段长度可持续扩展。Bitmap最后一位置0表示Bitmap结束，最后一位置1表示Bitmap向后扩展1 Byte，直至最后一位置0。
+3)	Value: 标识字段的值，长度为1 Byte的整数倍，类型及长度由报头字段语义表确定。
+
+### 可变长地址格式
 
 NewIP采用自解释编码，编码格式如下所示：
 
@@ -194,17 +199,17 @@ NewIP可变长地址配置，路由配置，UDP/TCP收发包demo代码链接如�
 
 **基础操作步骤：**
 
-1号开发板 ----- eth / wifi AP ----- 2号开发板，两块开发板通过eth网线或wifi AP连接。
+![image-20220915165414926](figures/image-20220915165414926.png)
 
 1、将demo代码拷贝到Linux编译机上，make clean，make all编译demo代码。
 
-2、将编译生成二级制文件上传到xxx开发板。
+2、将编译生成二级制文件上传到设备1，设备2。
 
 3、执行“ifconfig xxx up”开启网卡设备，xxx表示网卡名，比如eth0，wlan0。
 
-4、在1号开发板sh下执行“./nip_addr_cfg_demo server”给服务端配置0xDE00（2字节）变长地址，在2号开发板sh下执行“./nip_addr_cfg_demo client”给客户端配置0x50（1字节）变长地址，通过“cat /proc/net/nip_addr”查看内核地址配置结果。
+4、在设备1的sh下执行“./nip_addr_cfg_demo server”给服务端配置0xDE00（2字节）变长地址，在设备2的sh下执行“./nip_addr_cfg_demo client”给客户端配置0x50（1字节）变长地址，通过“cat /proc/net/nip_addr”查看内核地址配置结果。
 
-5、在1号开发板sh下执行“./nip_route_cfg_demo server”给服务端配置路由，在2号开发板sh下执行“./nip_route_cfg_demo client”给客户端配置路由，通过“cat /proc/net/nip_route”查看内核路由配置结果。
+5、在设备1的sh下执行“./nip_route_cfg_demo server”给服务端配置路由，在设备2的sh下执行“./nip_route_cfg_demo client”给客户端配置路由，通过“cat /proc/net/nip_route”查看内核路由配置结果。
 
 以上步骤操作完成后，可以进行UDP/TCP收发包，收发包demo默认使用上面步骤中配置的地址和路由。
 
