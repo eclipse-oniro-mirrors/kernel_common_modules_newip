@@ -2,7 +2,7 @@
 /*
  * NewIP Hooks
  *
- * Copyright (c) 2022, Huawei Tech. Co., Ltd.
+ * Copyright (c) 2022 Huawei Device Co., Ltd.
  */
 #ifdef CONFIG_NEWIP_HOOKS
 
