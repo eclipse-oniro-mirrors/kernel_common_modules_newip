@@ -1,9 +1,10 @@
 require "bit32"
 --[[
+SPDX-License-Identifier: GPL-2.0-or-later
+Copyright (c) 2022 Huawei Device Co., Ltd.
 Function  : wireshark lua configure for NewIP protocol stack
 Author    : yangyanjun
 Edit Date : 2022/5/27
-SPDX-License-Identifier: GPL-2.0-or-later
 --]]
 
 do -- lua begin
@@ -300,8 +301,8 @@ function get_nip_addr_len (first_addr)
 		return 5
 	elseif first_addr == 0xF3 then
 		return 7
-	elseif first_addr == 0xF4 then
-		return 9
+	elseif first_addr == 0xFE then
+		return 8
 	elseif first_addr == 0xFF then
 		return 2
 	else
