@@ -57,20 +57,21 @@ Note:If the text contains special characters, please escape them according to th
 	<oatconfig>
 		<policylist>
 			<policy name="projectPolicy" desc="">
-				<policyitem type="license" name="GPL" path="code\linux\.*"                        desc="linux kernel"/>
-				<policyitem type="license" name="BSD" path="code\common\.*"                       desc="NewIP common code"/>
-				<policyitem type="license" name="BSD" path="code\linux\net\newip\nip_checksum.c"  desc="NewIP common code (soft link file)"/>
-				<policyitem type="license" name="BSD" path="code\linux\net\newip\nip_checksum.h"  desc="NewIP common code (soft link file)"/>
-				<policyitem type="license" name="BSD" path="code\linux\net\newip\nip_addr.c"      desc="NewIP common code (soft link file)"/>
-				<policyitem type="license" name="BSD" path="code\linux\net\newip\nip_addr.h"      desc="NewIP common code (soft link file)"/>
-				<policyitem type="license" name="BSD" path="code\linux\net\newip\nip_hdr_decap.c" desc="NewIP common code (soft link file)"/>
-				<policyitem type="license" name="BSD" path="code\linux\net\newip\nip_hdr_encap.c" desc="NewIP common code (soft link file)"/>
-				<policyitem type="license" name="BSD" path="code\linux\net\newip\nip_hdr.h"       desc="NewIP common code (soft link file)"/>
-				<policyitem type="license" name="GPL" path="examples\nip_uapi.h"                  desc="GPL-2.0 WITH Linux-syscall-note"/>
-				<policyitem type="license" name="BSD" path="examples\.*"                          desc="NewIP examples code"/>
-				<policyitem type="copyright" name="Huawei Device Co., Ltd." path="code/.*"        desc="huawei copyright"/>
-				<policyitem type="license" name="GPL" path="LICENSE"                              desc="GPL and BSD dual license"/>
-				<policyitem type="license" name="BSD" path="LICENSE"                              desc="GPL and BSD dual license"/>
+				<policyitem type="license" name="GPL" path="src\linux\.*"                           desc="linux kernel"/>
+				<policyitem type="license" name="BSD" path="src\common\.*"                          desc="NewIP common code"/>
+				<policyitem type="license" name="BSD" path="src\linux\net\newip\nip_checksum.c"     desc="NewIP common code (soft link file)"/>
+				<policyitem type="license" name="BSD" path="src\linux\net\newip\nip_checksum.h"     desc="NewIP common code (soft link file)"/>
+				<policyitem type="license" name="BSD" path="src\linux\net\newip\nip_addr.c"         desc="NewIP common code (soft link file)"/>
+				<policyitem type="license" name="BSD" path="src\linux\net\newip\nip_addr.h"         desc="NewIP common code (soft link file)"/>
+				<policyitem type="license" name="BSD" path="src\linux\net\newip\nip_hdr_decap.c"    desc="NewIP common code (soft link file)"/>
+				<policyitem type="license" name="BSD" path="src\linux\net\newip\nip_hdr_encap.c"    desc="NewIP common code (soft link file)"/>
+				<policyitem type="license" name="BSD" path="src\linux\net\newip\nip_hdr.h"          desc="NewIP common code (soft link file)"/>
+				<policyitem type="license" name="GPL" path="examples\nip_uapi.h"                    desc="GPL-2.0 WITH Linux-syscall-note"/>
+				<policyitem type="license" name="BSD" path="examples\.*"                            desc="NewIP examples code"/>
+				<policyitem type="copyright" name="Huawei Device Co., Ltd." path="src/.*"           desc="huawei copyright"/>
+				<policyitem type="license" name="GPL" path="LICENSE"                                desc="GPL and BSD dual license"/>
+				<policyitem type="license" name="BSD" path="LICENSE"                                desc="GPL and BSD dual license"/>
+				<policyitem type="license" name="GPL" path="tools\wireshark_cfg_for_newip_v1.3.lua" desc="WireShark lua configure for NewIP protocol stack"/>
 			</policy>
 		</policylist>
 		<filefilterlist>
