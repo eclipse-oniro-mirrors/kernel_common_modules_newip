@@ -26,11 +26,4 @@ void nip_dgram_sock_seq_show(struct seq_file *seq, struct sock *sp, __u16 srcp,
 
 void ninet_destroy_sock(struct sock *sk);
 
-#define NEWIP_SEQ_DGRAM_HEADER                  \
-	"  s1  "                                    \
-	"local_address "                            \
-	"remote_address "                           \
-	"st tx_queue rc_queue tr tm->when retrnsmt" \
-	"  uid timeout inode ref pointer drops\n"
-
 #endif

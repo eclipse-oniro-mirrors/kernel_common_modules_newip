@@ -47,14 +47,6 @@ struct ninet_protocol {
 #define NIPCB(skb)  ((struct ninet_skb_parm *)&(TCP_SKB_CB(skb)->header.hnip))
 
 extern const struct ninet_protocol __rcu *ninet_protos[MAX_INET_PROTOS];
-
-int ninet_add_protocol(const struct ninet_protocol *prot,
-		       unsigned char protocol);
-int ninet_del_protocol(const struct ninet_protocol *prot,
-		       unsigned char protocol);
-int ninet_register_protosw(struct inet_protosw *p);
-void ninet_unregister_protosw(struct inet_protosw *p);
-
 extern const struct proto_ops ninet_dgram_ops;
 extern const struct proto_ops ninet_stream_ops;
 extern struct neigh_table nnd_tbl;
@@ -90,15 +82,10 @@ static inline u32 nip_addr_hash(const struct nip_addr *a)
 int nip_send_skb(struct sk_buff *skb);
 
 void ninet_destroy_sock(struct sock *sk);
-int nip_datagram_connect(struct sock *sk, struct sockaddr *addr, int addr_len);
-int nip_datagram_connect_v6_only(struct sock *sk, struct sockaddr *addr,
-				 int addr_len);
+int nip_datagram_connect_v6_only(struct sock *sk, struct sockaddr *addr, int addr_len);
 int nip_datagram_dst_update(struct sock *sk, bool fix_sk_saddr);
-void nip_datagram_release_cb(struct sock *sk);
-int ninet_add_protocol(const struct ninet_protocol *prot,
-		       unsigned char protocol);
-int ninet_eld_protocol(const struct ninet_protocol *prot,
-		       unsigned char protocol);
+int ninet_add_protocol(const struct ninet_protocol *prot, unsigned char protocol);
+int ninet_del_protocol(const struct ninet_protocol *prot, unsigned char protocol);
 int ninet_register_protosw(struct inet_protosw *p);
 void ninet_unregister_protosw(struct inet_protosw *p);
 int nip_input(struct sk_buff *skb);
@@ -131,12 +118,6 @@ int nip_getsockopt(struct sock *sk, int level,
 
 /* functions defined in nip_addrconf.c */
 int nip_addrconf_get_ifaddr(struct net *net, unsigned int cmd, void __user *arg);
-
-bool nip_rcv_saddr_equal(const struct nip_addr *sk1_rcv_saddr,
-				const struct nip_addr *sk2_rcv_saddr,
-				bool sk2_isnewip,
-				bool match_sk1_wildcard,
-				bool match_sk2_wildcard);
 
 void nip_dbg(const char *fmt, ...);
 #define DEBUG(format, ...) nip_dbg(format, ##__VA_ARGS__)

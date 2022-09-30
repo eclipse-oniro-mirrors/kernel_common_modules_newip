@@ -58,28 +58,6 @@ static struct nip_devconf newip_devconf_dflt __read_mostly = {
 	.ignore_routes_with_linkdown = 0,
 };
 
-/* only match New IP sock
- * match_sk*_wildcard == true:	NIP_ADDR_ANY equals to any New IP addresses
- *
- * match_sk*_wildcard == false: addresses must be exactly the same, i.e.
- *				NIP_ADDR_ANY only equals to NIP_ADDR_ANY
- */
-bool nip_rcv_saddr_equal(const struct nip_addr *sk1_rcv_saddr,
-				const struct nip_addr *sk2_rcv_saddr,
-				bool sk2_isnewip,
-				bool match_sk1_wildcard,
-				bool match_sk2_wildcard)
-{
-	if (!sk2_isnewip)
-		return false;
-	if (nip_addr_eq(sk1_rcv_saddr, sk2_rcv_saddr))
-		return true;
-	return (match_sk1_wildcard &&
-		nip_addr_eq(sk1_rcv_saddr, &nip_any_addr)) ||
-		(match_sk2_wildcard &&
-		 nip_addr_eq(sk2_rcv_saddr, &nip_any_addr));
-}
-
 /* Check if link is ready: is it up and is a valid qdisc available */
 static inline bool nip_addrconf_link_ready(const struct net_device *dev)
 {
@@ -482,37 +460,6 @@ static bool nip_chk_same_addr(struct net *net, const struct nip_addr *addr,
 		}
 	}
 	return false;
-}
-
-int __nip_get_lladdr(struct ninet_dev *idev, struct nip_addr *addr, u32 banned_flags)
-{
-	struct ninet_ifaddr *ifp;
-	int err = -EADDRNOTAVAIL;
-
-	list_for_each_entry_reverse(ifp, &idev->addr_list, if_list) {
-		if (!(ifp->flags & banned_flags)) {
-			*addr = ifp->addr;
-			err = 0;
-			break;
-		}
-	}
-	return err;
-}
-
-int nip_get_lladdr(struct net_device *dev, struct nip_addr *addr, u32 banned_flags)
-{
-	struct ninet_dev *idev;
-	int err = -EADDRNOTAVAIL;
-
-	rcu_read_lock();
-	idev = __nin_dev_get(dev);
-	if (idev) {
-		read_lock_bh(&idev->lock);
-		err = __nip_get_lladdr(idev, addr, banned_flags);
-		read_unlock_bh(&idev->lock);
-	}
-	rcu_read_unlock();
-	return err;
 }
 
 static int __nip_get_firstaddr(struct ninet_dev *idev, struct nip_addr *addr)

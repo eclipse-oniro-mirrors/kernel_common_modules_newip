@@ -7,6 +7,8 @@
  *
  * Based on  linux/net/ipv6/af_inet6.c
  */
+#define pr_fmt(fmt) "NIP AF-NIET: " fmt
+
 #include <linux/module.h>
 #include <linux/capability.h>
 #include <linux/errno.h>
@@ -61,8 +63,7 @@ atomic_t g_nip_socket_number = ATOMIC_INIT(0);
 
 static int disable_nip_mod;
 module_param_named(disable, disable_nip_mod, int, 0444);
-MODULE_PARM_DESC(disable,
-		 "Disable NewIP module such that it is non_functional");
+MODULE_PARM_DESC(disable, "Disable NewIP module such that it is non_functional");
 
 bool newip_mod_enabled(void)
 {
@@ -667,9 +668,8 @@ static int __init ninet_init(void)
 	for (r = &inetsw_nip[0]; r < &inetsw_nip[SOCK_MAX]; ++r)
 		INIT_LIST_HEAD(r);
 
-	if (disable_nip_mod) {
-		DEBUG("Loaded, but adminstratively disabled,");
-		DEBUG("reboot required to enable");
+	if (!newip_mod_enabled()) {
+		DEBUG("Loaded, but administratively disabled, reboot required to enable");
 		goto out;
 	}
 
@@ -748,8 +748,10 @@ out:
 	return err;
 
 nip_packet_fail:
-udp_fail:
+	tcp_nip_exit();
 tcp_fail:
+	nip_udp_exit();
+udp_fail:
 	nip_addrconf_cleanup();
 nip_addr_fail:
 	nip_route_cleanup();

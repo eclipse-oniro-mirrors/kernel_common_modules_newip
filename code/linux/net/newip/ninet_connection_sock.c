@@ -88,15 +88,3 @@ void ninet_csk_reqsk_queue_hash_add(struct sock *sk, struct request_sock *req,
 	inet_csk_reqsk_queue_added(sk);
 }
 
-/* Function
- *	Check whether the socket conflicts with the linked list. If no, 0 is returned
- * Parameter
- *	sk: The transport control block to listen
- *	tb: bind bucket, sock list for storing bind
- */
-int ninet_csk_bind_conflict(const struct sock *sk,
-			    const struct inet_bind_bucket *tb, bool relax)
-{
-	return 0;
-}
-

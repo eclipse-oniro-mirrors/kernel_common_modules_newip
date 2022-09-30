@@ -46,16 +46,8 @@ int nip_icmp_rcv(struct sk_buff *skb)
 	return ret;
 }
 
-static void nip_icmp_err(struct sk_buff *skb,
-			 struct ninet_skb_parm *opt,
-			 u8 type, uint8_t code,
-			 int offset, __be32 info)
-{
-}
-
 static const struct ninet_protocol nip_icmp_protocol = {
 	.handler = nip_icmp_rcv,
-	.err_handler = nip_icmp_err,
 	.flags = 0,
 };
 
