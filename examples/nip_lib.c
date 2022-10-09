@@ -1,16 +1,20 @@
-// SPDX-License-Identifier: BSD-2-Clause
+// SPDX-License-Identifier: BSD-3-Clause
 /*
  * Copyright (c) 2022 Huawei Device Co., Ltd.
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice, this list of
- *    conditions and the following disclaimer.
- *
- * 2. Redistributions in binary form must reproduce the above copyright notice, this list
- *    of conditions and the following disclaimer in the documentation and/or other materials
+ * 1. Redistributions of source code must retain the above
+ *    copyright notice, this list of conditions and the following
+ *    disclaimer.
+ * 2. Redistributions in binary form must reproduce the above
+ *    copyright notice, this list of conditions and the following
+ *    disclaimer in the documentation and/or other materials
  *    provided with the distribution.
+ * 3. Neither the name of the copyright holder nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
@@ -35,6 +39,10 @@
 #include "nip_uapi.h"
 #include "nip_lib.h"
 
+#define ADDR_STR_LEN 2
+#define STR_FMT_1    55
+#define STR_FMT_2    87
+
 int32_t nip_get_ifindex(const char *ifname, int *ifindex)
 {
 	int fd;
@@ -57,5 +65,85 @@ int32_t nip_get_ifindex(const char *ifname, int *ifindex)
 	printf("%s ifindex=%u\n", ifname, ifr.ifr_ifindex);
 	*ifindex = ifr.ifr_ifindex;
 	return 0;
+}
+
+int nip_addr_fmt(char *addr, struct nip_addr *sap, int addrlen_input)
+{
+	unsigned char first_byte;
+	int addrlen, i;
+
+	memset(sap, 0, sizeof(struct nip_addr));
+	for (i = 0; i < INDEX_MAX; i++) {
+		/* 0 ~ 9 = 48 ~ 57,  '0'构造成 0  = 48 - 48 */
+		if (addr[i] >= '0' && addr[i] <= '9')
+			addr[i] = addr[i] - '0';
+		/* A ~ F = 65 ~ 70,  'A'构造成 10 = 65 - 55 */
+		else if (addr[i] >= 'A' && addr[i] <= 'F')
+			addr[i] = addr[i] - STR_FMT_1;
+		/* a ~ f = 97 ~ 102, 'a'构造成 10 = 97 - 87 */
+		else if (addr[i] >= 'a' && addr[i] <= 'f')
+			addr[i] = addr[i] - STR_FMT_2;
+		else if (addr[i] == 0)
+			break;
+
+		printf("Newip addr error: uaddr[%u]=%c.\n", i, addr[i]);
+		return 1;
+	}
+
+	first_byte = addr[0] << NIP_ADDR_LEN_4;
+	first_byte += addr[1];
+	if (first_byte >= 0x00 && first_byte <= ADDR_FIRST_DC)
+		addrlen = NIP_ADDR_LEN_1;
+	else if ((first_byte > ADDR_FIRST_DC && first_byte <= ADDR_FIRST_F0) ||
+		 (first_byte == ADDR_FIRST_FF))
+		addrlen = NIP_ADDR_LEN_2;
+	else if (first_byte == ADDR_FIRST_F1)
+		addrlen = NIP_ADDR_LEN_3;
+	else if (first_byte == ADDR_FIRST_F2)
+		addrlen = NIP_ADDR_LEN_5;
+	else if (first_byte == ADDR_FIRST_F3)
+		addrlen = NIP_ADDR_LEN_7;
+	else if (first_byte == ADDR_FIRST_FE)
+		addrlen = NIP_ADDR_LEN_8;
+	else
+		addrlen = 0;
+
+	if (addrlen_input != addrlen) {
+		printf("Newip addr error, first_byte=0x%x.\n", first_byte);
+		return 1;
+	}
+
+	sap->bitlen = addrlen * NIP_ADDR_LEN_8;
+	printf("*************************************************\n");
+	printf("Newip addr len=%u\n", addrlen);
+	for (i = 0; i < addrlen; i++) {
+		sap->nip_addr_field8[i] = addr[i * INDEX_2] << INDEX_4;
+		sap->nip_addr_field8[i] += addr[i * INDEX_2 + 1];
+		printf("%02x ", sap->nip_addr_field8[i]);
+	}
+	printf("\n*************************************************\n\n");
+
+	return 0;
+}
+
+int nip_get_addr(char **args, struct nip_addr *addr)
+{
+	int ret;
+	char *sp = *args;
+	int addrlen_input = 0;
+	__u8 addr[INDEX_MAX] = {0};
+
+	while (*sp != '\0') {
+		addrlen_input += 1;
+		sp++;
+	}
+
+	if (addrlen_input % ADDR_STR_LEN != 0) {
+		printf("NewIP addr str-len invalid, addrlen_input=%u.\n", addrlen_input);
+		return -1;
+	}
+
+	ret = sscanf(*args, "%s", addr);
+	return nip_addr_fmt(addr, addr, addrlen_input / ADDR_STR_LEN);
 }
 

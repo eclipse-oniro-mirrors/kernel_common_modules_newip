@@ -430,25 +430,11 @@ static const struct ninet_protocol nip_udp_protocol = {
 	.flags = 0,
 };
 
-int udp_stub_hash(struct sock *sk)
-{
-	return 0;
-}
-
-void udp_stub_unhash(struct sock *sk)
-{
-}
-
-void udp_stub_rehash(struct sock *sk)
-{
-}
-
 /* Newip Udp related operations */
 struct proto nip_udp_prot = {
 	.name = "nip_udp",
 	.owner = THIS_MODULE,
 	.close = udp_lib_close,
-	.connect = nip_datagram_connect,
 	.disconnect = udp_disconnect,
 	.ioctl = udp_ioctl,
 	.init = udp_init_sock,
@@ -458,10 +444,8 @@ struct proto nip_udp_prot = {
 	.sendmsg = nip_udp_output,
 	.recvmsg = nip_udp_recvmsg,
 	.backlog_rcv = __nip_udp_queue_rcv_skb,
-	.release_cb = nip_datagram_release_cb,
 	.hash = udp_lib_hash,
 	.unhash = udp_lib_unhash,
-	.rehash = udp_stub_rehash,
 	.get_port = nip_udp_get_port,
 	.memory_allocated = &udp_memory_allocated,
 	.sysctl_mem = sysctl_udp_mem,

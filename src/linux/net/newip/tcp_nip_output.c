@@ -92,27 +92,6 @@ int tcp_nip_mtu_to_mss(struct sock *sk, int pmtu)
 	       (tcp_sk(sk)->tcp_header_len - sizeof(struct tcphdr));
 }
 
-/* Inverse of above */
-int tcp_nip_mss_to_mtu(struct sock *sk, int mss)
-{
-	const struct tcp_sock *tp = tcp_sk(sk);
-	const struct inet_connection_sock *icsk = inet_csk(sk);
-	int mtu;
-	int nip_hdr_len = get_nip_hdr_len(NIP_HDR_COMM, &sk->sk_nip_rcv_saddr, &sk->sk_nip_daddr);
-
-	nip_hdr_len = nip_hdr_len == 0 ? NIP_HDR_MAX : nip_hdr_len;
-	mtu = mss + tp->tcp_header_len + icsk->icsk_ext_hdr_len + nip_hdr_len;
-
-	/* IPv6 adds a frag_hdr in case RTAX_FEATURE_ALLFRAG is set */
-	if (icsk->icsk_af_ops->net_frag_header_len) {
-		const struct dst_entry *dst = __sk_dst_get(sk);
-
-		if (dst && dst_allfrag(dst))
-			mtu += icsk->icsk_af_ops->net_frag_header_len;
-	}
-	return mtu;
-}
-
 static inline void tcp_advance_send_head(struct sock *sk, const struct sk_buff *skb)
 {
 	if (tcp_skb_is_last(sk, skb))
@@ -197,22 +176,6 @@ u32 __nip_tcp_select_window(struct sock *sk)
 		DEBUG("%s wscale(%u) win change [%u to %u], [allowed|free]space=[%u, %u], mss=%u",
 		      __func__, tp->rx_opt.rcv_wscale, free_space, window,
 		      allowed_space, free_space, mss);
-	} else {
-		window = tp->rcv_wnd;
-		/* Get the largest window that is a nice multiple of mss.
-		 * Window clamp already applied above.
-		 * If our current window offering is within 1 mss of the
-		 * free space we just keep it. This prevents the divide
-		 * and multiply from happening most of the time.
-		 * We also don't do any window rounding when the free space
-		 * is too small.
-		 */
-		if (window <= free_space - mss || window > free_space)
-			window = rounddown(free_space, mss);
-		else if (mss == full_space &&
-			 free_space > window + (full_space >> 1))
-			window = free_space;
-		DEBUG("%s win change [%u to %u]", __func__, tp->rcv_wnd, window);
 	}
 	return window;
 }

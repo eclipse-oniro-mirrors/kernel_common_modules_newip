@@ -20,8 +20,6 @@ struct sk_buff;
 struct sock;
 struct sockaddr;
 
-int ninet_csk_bind_conflict(const struct sock *sk,
-			    const struct inet_bind_bucket *tb, bool relax);
 int ninet_csk_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl);
 void ninet_csk_reqsk_queue_hash_add(struct sock *sk, struct request_sock *req,
 				   unsigned long timeout);

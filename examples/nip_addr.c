@@ -45,7 +45,7 @@
  * ioctl(fd, SIOGIFINDEX, &ifr);
  * ifr.ifr_ifindex; ===> ifindex
  */
-int32_t nip_add_addr(int32_t ifindex, const unsigned char *addr, uint8_t addr_len)
+int32_t nip_add_addr(int32_t ifindex, struct nip_addr *addr, int opt)
 {
 	int fd, ret;
 	struct nip_ifreq ifrn;
@@ -55,13 +55,12 @@ int32_t nip_add_addr(int32_t ifindex, const unsigned char *addr, uint8_t addr_le
 		return -1;
 
 	memset(&ifrn, 0, sizeof(ifrn));
-	ifrn.ifrn_addr.bitlen = addr_len * 8; // Byte length is converted to bit length
-	memcpy(ifrn.ifrn_addr.nip_addr_field8, addr, addr_len);
+	ifrn.ifrn_addr = *addr;
 	ifrn.ifrn_ifindex = ifindex;
 
-	ret = ioctl(fd, SIOCSIFADDR, &ifrn);
+	ret = ioctl(fd, opt, &ifrn);
 	if (ret < 0 && errno != EEXIST) { // ignore File Exists error
-		printf("cfg newip addr fail, ifindex=%d, ret=%d.\n", ifindex, ret);
+		printf("cfg newip addr fail, ifindex=%d, opt=%u, ret=%d.\n", ifindex, opt, ret);
 		close(fd);
 		return -1;
 	}
@@ -70,46 +69,69 @@ int32_t nip_add_addr(int32_t ifindex, const unsigned char *addr, uint8_t addr_le
 	return 0;
 }
 
-/* Before executing the use case, run ifconfig XXX up.
- * XXX indicates the NIC name, for example, eth0 and wlan0
- */
-int main(int argc, char **argv)
+void cmd_help(void)
+{
+	/* nip_addr wlan0 add 01 (在wlan0上配置地址01) */
+	/* nip_addr wlan0 del 01 (在wlan0上删除地址01) */
+	printf("[cmd example] nip_addr <netcard-name> { add | del } <addr>\n");
+}
+
+int main(int argc, char **argv_input)
 {
 	int ret;
+	int opt;
 	int ifindex = 0;
-	uint8_t client_addr[INDEX_1] = {0x50};       // 1-byte address of the client: 0x50
-	uint8_t server_addr[INDEX_2] = {0xDE, 0x00}; // 2-byte address of the server: 0xDE00
-	uint8_t *addr;
-	uint8_t addr_len;
+	char **argv = argv_input;
+	char cmd[ARRAY_LEN];
+	char dev[ARRAY_LEN];
+	struct nip_addr addr = {0};
 
-	if (argc == DEMO_INPUT_1) {
-		if (!strcmp(*(argv + 1), "server")) {
-			printf("server cfg addr=0x%02x%02x.\n",
-			       server_addr[INDEX_0], server_addr[INDEX_1]);
-			addr = server_addr;
-			addr_len = sizeof(server_addr);
-		} else if (!strcmp(*(argv + 1), "client")) {
-			printf("client cfg addr=0x%x02x.\n", client_addr[INDEX_0]);
-			addr = client_addr;
-			addr_len = sizeof(client_addr);
-		} else {
-			printf("invalid addr cfg input.\n");
-			return -1;
-		}
-	} else {
-		printf("unsupport addr cfg input.\n");
+	if (argc != DEMO_INPUT_3) {
+		printf("unsupport addr cfg input, argc=%u.\n", argc);
+		cmd_help();
 		return -1;
 	}
 
-	ret = nip_get_ifindex(NIC_NAME, &ifindex);
+	/* 配置参数1解析: <netcard-name> */
+	argv++;
+	memset(dev, 0, ARRAY_LEN);
+	ret = sscanf(*argv, "%s", dev);
+	if (strncmp(dev, "wlan", NAME_WLAN_LEN) && strncmp(dev, "eth", NAME_ETH_LEN)) {
+		printf("unsupport addr cfg cmd-1, cmd=%s.\n", dev);
+		cmd_help();
+		return -1;
+	}
+	ret = nip_get_ifindex(dev, &ifindex);
 	if (ret != 0)
 		return -1;
 
-	ret = nip_add_addr(ifindex, addr, addr_len);
+	/* 配置参数2解析: { add | del } */
+	argv++;
+	memset(cmd, 0, ARRAY_LEN);
+	ret = sscanf(*argv, "%s", cmd);
+	if (!strncmp(cmd, "add", NAME_WLAN_LEN)) {
+		opt = SIOCSIFADDR;
+	} else if (!strncmp(cmd, "del", NAME_WLAN_LEN)) {
+		opt = SIOCDIFADDR;
+	} else {
+		printf("unsupport addr cfg cmd-2, cmd=%s.\n", cmd);
+		cmd_help();
+		return -1;
+	}
+
+	/* 配置参数3解析: <addr> */
+	argv++;
+	if (nip_get_addr(argv, &addr)) {
+		printf("unsupport addr cfg cmd-3.\n");
+		cmd_help();
+		return 1;
+	}
+
+	ret = nip_add_addr(ifindex, &addr, opt);
 	if (ret != 0)
 		return -1;
 
-	printf("%s %s(ifindex=%u) cfg addr success.\n", *argv, NIC_NAME, ifindex);
+	printf("%s (ifindex=%u) cfg addr success.\n", dev, ifindex);
 	return 0;
 }
 

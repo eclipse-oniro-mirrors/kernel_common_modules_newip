@@ -47,8 +47,8 @@
  * ioctl(fd, SIOGIFINDEX, &ifr);
  * ifr.ifr_ifindex; ===> ifindex
  */
-int nip_route_add(int ifindex, const unsigned char *dst_addr, uint8_t dst_addr_len,
-	const unsigned char *gateway_addr, uint8_t gateway_addr_len)
+int nip_route_add(int ifindex, struct nip_addr *dst_addr, struct nip_addr *gateway_addr,
+		  uint8_t gateway_flag, int opt)
 {
 	int fd, ret;
 	struct nip_rtmsg rt;
@@ -60,16 +60,14 @@ int nip_route_add(int ifindex, const unsigned char *dst_addr, uint8_t dst_addr_l
 	memset(&rt, 0, sizeof(rt));
 	rt.rtmsg_ifindex = ifindex;
 	rt.rtmsg_flags = RTF_UP;
-	rt.rtmsg_dst.bitlen = dst_addr_len * 8;
-	memcpy(rt.rtmsg_dst.nip_addr_field8, dst_addr, dst_addr_len);
+	rt.rtmsg_dst = *dst_addr;
 
-	if (gateway_addr) {
-		rt.rtmsg_gateway.bitlen = gateway_addr_len * 8;
-		memcpy(rt.rtmsg_gateway.nip_addr_field8, gateway_addr, gateway_addr_len);
+	if (gateway_flag) {
+		rt.rtmsg_gateway = *gateway_addr;
 		rt.rtmsg_flags |= RTF_GATEWAY;
 	}
 
-	ret = ioctl(fd, SIOCADDRT, &rt);
+	ret = ioctl(fd, opt, &rt);
 	if (ret < 0 && errno != EEXIST) { // ignore File Exists error
 		close(fd);
 		return -1;
@@ -79,49 +77,96 @@ int nip_route_add(int ifindex, const unsigned char *dst_addr, uint8_t dst_addr_l
 	return 0;
 }
 
-int main(int argc, char **argv)
+void cmd_help(void)
+{
+	/* nip_route add 02   wlan0    (配置目的地址02设备路由，出口是wlan0)
+	 * nip_route add 02   wlan0 03 (配置目的地址02设备路由，出口是wlan0，网关地址是03)
+	 * nip_route add ff09 wlan0 03 (配置广播默认路由，      出口是wlan0，网关地址是03)
+	 */
+	printf("\n[cmd example]\n");
+	printf("nip_route { add | del } <dst-addr> <netcard-name>\n");
+	printf("nip_route { add | del } <dst-addr> <netcard-name> <gateway-addr>\n");
+}
+
+int main(int argc, char **argv_input)
 {
 	int ret;
+	int opt;
 	int ifindex = 0;
-	uint8_t client_addr[INDEX_1] = {0x50};       // 1-byte address of the client: 0x50
-	uint8_t server_addr[INDEX_2] = {0xDE, 0x00}; // 2-byte address of the server: 0xDE00
-	uint8_t *dst_addr;
 	uint8_t dst_addr_len;
-	uint8_t *gateway_addr;
 	uint8_t gateway_addr_len;
+	uint8_t gateway_flag = 0;
+	char **argv = argv_input;
+	char cmd[ARRAY_LEN];
+	char dev[ARRAY_LEN];
+	struct nip_addr dst_addr = {0};
+	struct nip_addr gateway_addr = {0};
 
-	if (argc == DEMO_INPUT_1) {
-		if (!strcmp(*(argv + 1), "server")) {
-			printf("server cfg route, dst-addr=0x%x02.\n", client_addr[INDEX_0]);
-			dst_addr = client_addr;
-			dst_addr_len = 1;
-		} else if (!strcmp(*(argv + 1), "client")) {
-			printf("client cfg route, dst-addr=0x%02x%02x.\n",
-			       server_addr[INDEX_0], server_addr[INDEX_1]);
-			dst_addr = server_addr;
-			dst_addr_len = 2;
-		} else {
-			printf("invalid route cfg input.\n");
-			return -1;
-		}
+	if (argc != DEMO_INPUT_3 && argc != DEMO_INPUT_4) {
+		printf("unsupport route cfg input, argc=%u.\n", argc);
+		cmd_help();
+		return -1;
+	}
+
+	/* 配置参数1解析: { add | del } */
+	argv++;
+	memset(cmd, 0, ARRAY_LEN);
+	ret = sscanf(*argv, "%s", cmd);
+	if (!strncmp(cmd, "add", NAME_WLAN_LEN)) {
+		opt = SIOCADDRT;
+	} else if (!strncmp(cmd, "del", NAME_WLAN_LEN)) {
+		opt = SIOCDELRT;
 	} else {
-		printf("unsupport route cfg input.\n");
+		printf("unsupport route cfg cmd-1, cmd=%s.\n", cmd);
+		cmd_help();
 		return -1;
 	}
 
-	ret = nip_get_ifindex(NIC_NAME, &ifindex);
+	/* 配置参数2解析: <dst-addr> */
+	argv++;
+	if (nip_get_addr(argv, &dst_addr)) {
+		printf("unsupport route cfg cmd-2.\n");
+		cmd_help();
+		return 1;
+	}
+
+	/* 配置参数3解析: <netcard-name> */
+	argv++;
+	memset(dev, 0, ARRAY_LEN);
+	ret = sscanf(*argv, "%s", dev);
+	if (strncmp(dev, "wlan", NAME_WLAN_LEN) && strncmp(dev, "eth", NAME_ETH_LEN)) {
+		printf("unsupport route cfg cmd-3, cmd=%s.\n", dev);
+		cmd_help();
+		return -1;
+	}
+	ret = nip_get_ifindex(dev, &ifindex);
+	if (ret != 0)
+		return -1;
+
+	/* 配置参数4解析: <gateway-addr> */
+	if (argc == DEMO_INPUT_4) {
+		argv++;
+		if (nip_get_addr(argv, &gateway_addr)) {
+			printf("unsupport route cfg cmd-4.\n");
+			cmd_help();
+			return 1;
+		}
+		gateway_flag = 1;
+	}
+
+	ret = nip_get_ifindex(dev, &ifindex);
 	if (ret != 0) {
-		printf("get %s ifindex fail, ret=%d.\n", NIC_NAME, ret);
+		printf("get %s ifindex fail, ret=%d.\n", dev, ret);
 		return -1;
 	}
 
-	ret = nip_route_add(ifindex, dst_addr, dst_addr_len, NULL, 0);
+	ret = nip_route_add(ifindex, &dst_addr, &gateway_addr, gateway_flag, opt);
 	if (ret != 0) {
-		printf("get %s ifindex fail, ret=%d.\n", NIC_NAME, ret);
+		printf("get %s ifindex fail, ret=%d.\n", dev, ret);
 		return -1;
 	}
 
-	printf("%s %s(ifindex=%u) cfg route success.\n", *argv, NIC_NAME, ifindex);
+	printf("%s (ifindex=%u) cfg route success.\n", dev, ifindex);
 	return 0;
 }
 

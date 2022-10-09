@@ -26,10 +26,7 @@ void nin_dev_finish_destroy(struct ninet_dev *idev)
 	WARN_ON(!list_empty(&idev->addr_list));
 
 	dev_put(dev);
-	if (!idev->dead) {
-		DEBUG(KERN_WARNING "Freeing alive ninet device.\n");
-		return;
-	}
-	call_rcu(&idev->rcu, nin_dev_finish_destroy_rcu);
+	if (idev->dead)
+		call_rcu(&idev->rcu, nin_dev_finish_destroy_rcu);
 }
 

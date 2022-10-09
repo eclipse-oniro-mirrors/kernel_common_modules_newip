@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: BSD-3-Clause */
+// SPDX-License-Identifier: BSD-3-Clause
 /*
  * Copyright (c) 2022 Huawei Device Co., Ltd.
  *
@@ -28,21 +28,50 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef _NEWIP_ROUTE_H
-#define _NEWIP_ROUTE_H
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <stdint.h>
 
-#include "nip.h"
+#define AF_NINET_PATH        ("/sys/module/newip/parameters/af_ninet")
+#define AF_NINET_LENTH       (5)
 
-struct nip_rtmsg {
-	struct nip_addr rtmsg_dst;
-	struct nip_addr rtmsg_src;
-	struct nip_addr rtmsg_gateway;
-	char dev_name[10];
-	unsigned int rtmsg_type;
-	int rtmsg_ifindex;
-	unsigned int rtmsg_metric;
-	unsigned long rtmsg_info;
-	unsigned int rtmsg_flags;
-};
+int g_af_ninet;
 
-#endif /* _NEWIP_ROUTE_H */
+void _get_af_ninet(void)
+{
+	char tmp[AF_NINET_LENTH];
+	FILE *fn = fopen(AF_NINET_PATH, "r");
+
+	if (!fn) {
+		printf("fail to open %s.\n\n", AF_NINET_PATH);
+		return;
+	}
+
+	if (fgets(tmp, AF_NINET_LENTH, fn) == NULL) {
+		printf("fail to gets %s.\n\n", AF_NINET_PATH);
+		fclose(fn);
+		return;
+	}
+
+	fclose(fn);
+	g_af_ninet = atoi(tmp);
+}
+
+int get_af_ninet(void)
+{
+	if (g_af_ninet == 0)
+		_get_af_ninet();
+
+	return g_af_ninet;
+}
+
+int main(int argc, char **argv)
+{
+	int af_ninet = get_af_ninet();
+
+	printf("af_ninet=%d\n\n", g_af_ninet);
+	return 0;
+}
+

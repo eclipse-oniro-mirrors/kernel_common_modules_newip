@@ -47,7 +47,8 @@ NewIP内核协议栈主要代码目录结构如下：
 │       │   └── uapi
 │       └── net
 │           └── newip     # NewIP 功能代码
-└── figures               # ReadMe 内嵌图例
+├── figures               # ReadMe 内嵌图例
+└── tools                 # NewIP 配套工具
 ```
 
 ## 编译构建

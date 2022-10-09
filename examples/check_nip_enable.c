@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: BSD-3-Clause */
+// SPDX-License-Identifier: BSD-3-Clause
 /*
  * Copyright (c) 2022 Huawei Device Co., Ltd.
  *
@@ -28,21 +28,51 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef _NEWIP_ROUTE_H
-#define _NEWIP_ROUTE_H
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <stdint.h>
 
-#include "nip.h"
+#define NIP_DISABLE_PATH        ("/sys/module/newip/parameters/disable")
+#define NIP_DISABLE_LENTH       (5)
+#define NIP_ENABLE_INVALID      (0xFF)
 
-struct nip_rtmsg {
-	struct nip_addr rtmsg_dst;
-	struct nip_addr rtmsg_src;
-	struct nip_addr rtmsg_gateway;
-	char dev_name[10];
-	unsigned int rtmsg_type;
-	int rtmsg_ifindex;
-	unsigned int rtmsg_metric;
-	unsigned long rtmsg_info;
-	unsigned int rtmsg_flags;
-};
+int g_nip_enable = NIP_ENABLE_INVALID;
 
-#endif /* _NEWIP_ROUTE_H */
+void _check_nip_enable(void)
+{
+	char tmp[NIP_DISABLE_LENTH];
+	FILE *fn = fopen(NIP_DISABLE_PATH, "r");
+
+	if (!fn) {
+		printf("fail to open %s.\n\n", NIP_DISABLE_PATH);
+		return;
+	}
+
+	if (fgets(tmp, NIP_DISABLE_LENTH, fn) == NULL) {
+		printf("fail to gets %s.\n\n", NIP_DISABLE_PATH);
+		fclose(fn);
+		return;
+	}
+
+	fclose(fn);
+	g_nip_enable = atoi(tmp) ? 0 : 1;
+}
+
+int check_nip_enable(void)
+{
+	if (g_nip_enable == NIP_ENABLE_INVALID)
+		_check_nip_enable();
+
+	return g_nip_enable;
+}
+
+int main(int argc, char **argv)
+{
+	int af_ninet = check_nip_enable();
+
+	printf("nip_enable=%d\n\n", g_nip_enable);
+	return 0;
+}
+
