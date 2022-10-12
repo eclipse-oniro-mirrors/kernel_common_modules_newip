@@ -38,7 +38,7 @@ NewIP内核协议栈主要代码目录结构如下：
 ```
 /foundation/communication/sfc/newip
 ├── examples              # NewIP 用户态样例代码
-├── code
+├── src
 │   ├── common            # NewIP 通用代码
 │   └── linux             # NewIP Linux内核代码
 │       ├── include       # NewIP 头文件
