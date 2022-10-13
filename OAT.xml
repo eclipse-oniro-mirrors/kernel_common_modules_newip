@@ -69,8 +69,8 @@ Note:If the text contains special characters, please escape them according to th
 				<policyitem type="license" name="GPL" path="examples\nip_uapi.h"                    desc="GPL-2.0 WITH Linux-syscall-note"/>
 				<policyitem type="license" name="BSD" path="examples\.*"                            desc="NewIP examples code"/>
 				<policyitem type="copyright" name="Huawei Device Co., Ltd." path="src/.*"           desc="huawei copyright"/>
-				<policyitem type="license" name="GPL" path="LICENSE"                                desc="GPL and BSD dual license"/>
-				<policyitem type="license" name="BSD" path="LICENSE"                                desc="GPL and BSD dual license"/>
+				<policyitem type="license" name="GPL" path="LICENSE-GPL-2.0"                        desc="GPL-2.0 license"/>
+				<policyitem type="license" name="BSD" path="LICENSE-BSD-3-Clause"                   desc="BSD-3-Clause license"/>
 				<policyitem type="license" name="GPL" path="tools\wireshark_cfg_for_newip.lua"      desc="WireShark lua configure for NewIP protocol stack"/>
 			</policy>
 		</policylist>
@@ -78,6 +78,9 @@ Note:If the text contains special characters, please escape them according to th
 			<filefilter name="defaultFilter" desc="Files not to check">
 				<filteritem type="filepath" name="figures/.*" desc="Describes the architecture of the NewIP"/>
 				<filteritem type="filepath" name="apply_newip.sh" desc="shield"/>
+				<filteritem type="filepath" name="LICENSE" desc="license file"/>
+				<filteritem type="filepath" name="README_zh.md" desc="readme file"/>
+				<filteritem type="filepath" name="README.md" desc="readme file"/>
 			</filefilter>
 		</filefilterlist>
 	</oatconfig>
