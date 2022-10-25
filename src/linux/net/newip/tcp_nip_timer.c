@@ -137,6 +137,7 @@ static int tcp_nip_write_timeout(struct sock *sk)
 void tcp_nip_retransmit_timer(struct sock *sk)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
+	struct tcp_nip_common *ntp = &tcp_nip_sk(sk)->common;
 	struct inet_connection_sock *icsk = inet_csk(sk);
 	struct sk_buff *skb = tcp_write_queue_head(sk);
 	struct tcp_skb_cb *scb = TCP_SKB_CB(skb);
@@ -161,7 +162,8 @@ void tcp_nip_retransmit_timer(struct sock *sk)
 					  TCP_RTO_MAX);
 
 		SSTHRESH_DBG("%s seq %u retransmit fail, win=%u, rto=%u, pkt_out=%u",
-			     __func__, scb->seq, tp->nip_ssthresh, icsk->icsk_rto, tp->packets_out);
+			     __func__, scb->seq, ntp->nip_ssthresh,
+			     icsk->icsk_rto, tp->packets_out);
 		return;
 	}
 	icsk->icsk_backoff++;
@@ -171,10 +173,10 @@ void tcp_nip_retransmit_timer(struct sock *sk)
 	icsk->icsk_rto = min(icsk->icsk_rto << 1, TCP_RTO_MAX);
 
 	SSTHRESH_DBG("%s seq %u, reset win %u to %u, rto %u to %u, pkt_out=%u",
-		     __func__, scb->seq, tp->nip_ssthresh, g_ssthresh_low,
+		     __func__, scb->seq, ntp->nip_ssthresh, g_ssthresh_low,
 		     icsk_rto_last, icsk->icsk_rto, tp->packets_out);
 
-	tp->nip_ssthresh = g_ssthresh_low;
+	ntp->nip_ssthresh = g_ssthresh_low;
 
 	inet_csk_reset_xmit_timer(sk, ICSK_TIME_RETRANS, icsk->icsk_rto, TCP_RTO_MAX);
 }
@@ -280,6 +282,7 @@ static bool tcp_nip_keepalive_is_timeout(struct sock *sk, u32 elapsed)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
+	struct tcp_nip_common *ntp = &tcp_nip_sk(sk)->common;
 	u32 keepalive_time = keepalive_time_when(tp);
 	bool is_timeout = false;
 
@@ -290,11 +293,11 @@ static bool tcp_nip_keepalive_is_timeout(struct sock *sk, u32 elapsed)
 		 */
 		if ((icsk->icsk_user_timeout != 0 &&
 		     elapsed >= msecs_to_jiffies(icsk->icsk_user_timeout) &&
-		     tp->nip_keepalive_out > 0) ||
+		     ntp->nip_keepalive_out > 0) ||
 		     (icsk->icsk_user_timeout == 0 &&
-		      tp->nip_keepalive_out >= keepalive_probes(tp))) {
+		      ntp->nip_keepalive_out >= keepalive_probes(tp))) {
 			DEBUG("%s normal keepalive timeout, keepalive_out=%u.",
-			      __func__, tp->nip_keepalive_out);
+			      __func__, ntp->nip_keepalive_out);
 			tcp_nip_write_err(sk);
 			is_timeout = true;
 		}
@@ -307,6 +310,7 @@ static void tcp_nip_keepalive_timer(struct timer_list *t)
 {
 	struct sock *sk = from_timer(sk, t, sk_timer);
 	struct tcp_sock *tp = tcp_sk(sk);
+	struct tcp_nip_common *ntp = &tcp_nip_sk(sk)->common;
 	u32 elapsed;
 
 	/* Only process if socket is not in use. */
@@ -348,8 +352,8 @@ static void tcp_nip_keepalive_timer(struct timer_list *t)
 			goto out;
 
 		if (tcp_nip_write_wakeup(sk, LINUX_MIB_TCPKEEPALIVE) <= 0) {
-			tp->nip_keepalive_out++;
-			tp->idle_ka_probes_out++;
+			ntp->nip_keepalive_out++;
+			ntp->idle_ka_probes_out++;
 			elapsed = keepalive_intvl_when(tp);
 		} else {
 			/* If keepalive was lost due to local congestion,
