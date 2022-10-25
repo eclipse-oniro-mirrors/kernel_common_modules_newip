@@ -159,6 +159,16 @@ static inline bool tcp_nip_write_queue_empty(struct sock *sk)
 	return skb_queue_empty(&sk->sk_write_queue);
 }
 
+static inline struct tcp_nip_sock *tcp_nip_sk(const struct sock *sk)
+{
+	return (struct tcp_nip_sock *)sk;
+}
+
+static inline struct tcp_nip_request_sock *tcp_nip_rsk(const struct request_sock *req)
+{
+	return (struct tcp_nip_request_sock *)req;
+}
+
 /* connect */
 int __tcp_nip_connect(struct sock *sk);
 int _tcp_nip_conn_request(struct request_sock_ops *rsk_ops,

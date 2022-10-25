@@ -54,8 +54,24 @@ struct ninet_skb_parm {
 };
 #pragma pack()
 
+struct tcp_nip_common {
+	u32 ack_retrans_num;
+	u32 ack_retrans_seq;
+	u32 nip_ssthresh;
+	u32 nip_ssthresh_reset;
+	bool nip_keepalive_enable;
+	u32 idle_ka_probes_out;
+	u32 nip_keepalive_out;
+	u32 last_rcv_nxt;
+	u32 dup_ack_cnt;
+	u32 keepalive_time_bak;
+	u32 keepalive_probes_bak;
+	u32 keepalive_intvl_bak;
+};
+
 struct tcp_nip_request_sock {
 	struct tcp_request_sock tcp_nip_rsk_tcp;
+	struct tcp_nip_common common;
 };
 
 struct nip_udp_sock {
@@ -64,6 +80,7 @@ struct nip_udp_sock {
 
 struct tcp_nip_sock {
 	struct tcp_sock tcp;
+	struct tcp_nip_common common;
 };
 
 #endif /* _NIP_H */

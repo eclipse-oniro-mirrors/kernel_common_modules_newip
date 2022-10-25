@@ -129,6 +129,7 @@ u32 __nip_tcp_select_window(struct sock *sk)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
+	struct tcp_nip_common *ntp = &tcp_nip_sk(sk)->common;
 	int mss = tcp_nip_current_mss(sk); /* TCP_BASE_MSS */
 	int allowed_space = tcp_full_space(sk);
 	int full_space = min_t(int, tp->window_clamp, allowed_space); /* Total receive cache */
@@ -155,7 +156,8 @@ u32 __nip_tcp_select_window(struct sock *sk)
 
 	if (g_nip_tcp_rcv_win_enable) {
 		if (g_ssthresh_enable == 1)
-			free_space = free_space > tp->nip_ssthresh ? tp->nip_ssthresh : free_space;
+			free_space = free_space > ntp->nip_ssthresh ?
+				     ntp->nip_ssthresh : free_space;
 		else
 			free_space = free_space > tp->rcv_ssthresh ? tp->rcv_ssthresh : free_space;
 	} else {
@@ -1042,15 +1044,16 @@ static bool tcp_nip_write_xmit(struct sock *sk, unsigned int mss_now, int nonagl
 			       int push_one, gfp_t gfp)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
+	struct tcp_nip_common *ntp = &tcp_nip_sk(sk)->common;
 	struct sk_buff *skb;
-	u32 snd_num = g_nip_tcp_snd_win_enable ? (tp->nip_ssthresh / mss_now) : 0xFFFFFFFF;
-	u32 last_nip_ssthresh = tp->nip_ssthresh;
+	u32 snd_num = g_nip_tcp_snd_win_enable ? (ntp->nip_ssthresh / mss_now) : 0xFFFFFFFF;
+	u32 last_nip_ssthresh = ntp->nip_ssthresh;
 	bool snd_wnd_ready;
 	static const char * const str[] = {"can`t send pkt because no window",
 					   "have window to send pkt"};
 
 	tcp_nip_keepalive_enable(sk);
-	tp->idle_ka_probes_out = 0;
+	ntp->idle_ka_probes_out = 0;
 
 	tcp_mstamp_refresh(tp);
 
@@ -1058,11 +1061,11 @@ static bool tcp_nip_write_xmit(struct sock *sk, unsigned int mss_now, int nonagl
 		u32 tstamp = tcp_jiffies32 - tp->rcv_tstamp;
 
 		if (tstamp >= g_ack_to_nxt_snd_tstamp) {
-			tp->nip_ssthresh = g_ssthresh_low_min;
-			snd_num = tp->nip_ssthresh / mss_now;
+			ntp->nip_ssthresh = g_ssthresh_low_min;
+			snd_num = ntp->nip_ssthresh / mss_now;
 			SSTHRESH_DBG("%s new snd tstamp %u >= %u, ssthresh %u to %u, snd_num=%u",
 				     __func__, tstamp, g_ack_to_nxt_snd_tstamp,
-				     last_nip_ssthresh, tp->nip_ssthresh, snd_num);
+				     last_nip_ssthresh, ntp->nip_ssthresh, snd_num);
 		}
 	}
 
